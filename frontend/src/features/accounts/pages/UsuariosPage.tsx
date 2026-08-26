@@ -34,6 +34,13 @@ export function UsuariosPage() {
   }
 
   const columns = [
+    {
+      title: 'ID',
+      dataIndex: 'id',
+      key: 'id',
+      width: 60,
+      render: (id: number) => <strong>{id}</strong>,
+    },
     { title: 'Email', dataIndex: 'email', key: 'email' },
     { title: 'Nombre', dataIndex: 'nombre_completo', key: 'nombre_completo' },
     {

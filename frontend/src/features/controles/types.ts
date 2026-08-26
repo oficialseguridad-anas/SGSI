@@ -1,5 +1,5 @@
 export type CategoriaControl = 'ORGANIZACIONAL' | 'PERSONAS' | 'FISICO' | 'TECNOLOGICO';
-export type EstadoImplementacion = 'NO_IMPLEMENTADO' | 'PARCIAL' | 'IMPLEMENTADO' | 'NO_APLICA';
+export type EstadoImplementacion = 'NO_IMPLEMENTADO' | 'PARCIAL' | 'IMPLEMENTADO';
 
 export interface Control {
   id: number;
@@ -14,14 +14,13 @@ export interface AplicabilidadControl {
   control: number;
   control_codigo: string;
   control_nombre: string;
+  control_descripcion: string;
   control_categoria: CategoriaControl;
   aplica: boolean;
   justificacion: string;
   estado_implementacion: EstadoImplementacion;
-  evidencia: string;
-  responsable: number | null;
-  responsable_nombre: string | null;
-  fecha_ultima_revision: string | null;
+  referencia_documento: string;
+  observaciones: string;
 }
 
 export interface AplicabilidadInput {
@@ -29,7 +28,6 @@ export interface AplicabilidadInput {
   aplica: boolean;
   justificacion: string;
   estado_implementacion: EstadoImplementacion;
-  evidencia: string;
-  responsable: number | null;
-  fecha_ultima_revision: string | null;
+  referencia_documento: string;
+  observaciones: string;
 }

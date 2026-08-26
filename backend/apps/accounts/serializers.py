@@ -11,11 +11,12 @@ class RolSerializer(serializers.ModelSerializer):
 
 class UsuarioSerializer(serializers.ModelSerializer):
     roles = RolSerializer(many=True, read_only=True)
+    direccion_nombre = serializers.CharField(source='direccion.nombre', read_only=True, default=None)
 
     class Meta:
         model = Usuario
         fields = [
-            'id', 'email', 'nombre_completo', 'cargo', 'area', 'telefono',
+            'id', 'email', 'nombre_completo', 'cargo', 'direccion', 'direccion_nombre', 'telefono',
             'is_active', 'debe_cambiar_password', 'roles', 'date_joined',
         ]
         read_only_fields = ['id', 'date_joined']
@@ -27,7 +28,7 @@ class UsuarioCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Usuario
         fields = [
-            'id', 'email', 'nombre_completo', 'cargo', 'area', 'telefono',
+            'id', 'email', 'nombre_completo', 'cargo', 'direccion', 'telefono',
             'password', 'is_active', 'debe_cambiar_password',
         ]
 
@@ -46,12 +47,13 @@ class UsuarioRolSerializer(serializers.ModelSerializer):
 class MeSerializer(serializers.ModelSerializer):
     roles = serializers.SerializerMethodField()
     permisos = serializers.SerializerMethodField()
+    direccion_nombre = serializers.CharField(source='direccion.nombre', read_only=True, default=None)
 
     class Meta:
         model = Usuario
         fields = [
-            'id', 'email', 'nombre_completo', 'cargo', 'area',
-            'is_superuser', 'is_staff', 'roles', 'permisos',
+            'id', 'email', 'nombre_completo', 'cargo', 'direccion_nombre',
+            'is_superuser', 'is_staff', 'otp_habilitado', 'otp_metodo', 'roles', 'permisos',
         ]
 
     def get_roles(self, obj):
@@ -59,3 +61,30 @@ class MeSerializer(serializers.ModelSerializer):
 
     def get_permisos(self, obj):
         return sorted(obj.get_all_permissions())
+
+
+class Setup2FASerializer(serializers.Serializer):
+    secreto = serializers.CharField(read_only=True)
+    otpauth_url = serializers.CharField(read_only=True)
+
+
+class Activar2FASerializer(serializers.Serializer):
+    codigo = serializers.CharField()
+
+
+class Desactivar2FASerializer(serializers.Serializer):
+    password = serializers.CharField()
+    codigo = serializers.CharField()
+
+
+class VerificarOtpSerializer(serializers.Serializer):
+    otp_token = serializers.CharField()
+    codigo = serializers.CharField()
+
+
+class ActivarEmailOtpSerializer(serializers.Serializer):
+    codigo = serializers.CharField()
+
+
+class ReenviarCodigoOtpSerializer(serializers.Serializer):
+    otp_token = serializers.CharField()

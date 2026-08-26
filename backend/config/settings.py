@@ -35,10 +35,17 @@ INSTALLED_APPS = [
     # Apps del SGSI
     'apps.core',
     'apps.accounts',
+    'apps.activos',
+    'apps.controles',
+    'apps.riesgos',
+    'apps.documentos',
+    'apps.indicadores',
+    'apps.objetivos',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -67,26 +74,38 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# Base de datos: SQL Server (mssql-django). Ver backend/.env para credenciales locales.
-DATABASES = {
-    'default': {
-        'ENGINE': 'mssql',
-        'NAME': env('DB_NAME', default='sgsi_iso27001'),
-        'HOST': env('DB_HOST', default='localhost\\SQLEXPRESS'),
-        'USER': env('DB_USER', default=''),
-        'PASSWORD': env('DB_PASSWORD', default=''),
-        'OPTIONS': {
-            'driver': env('DB_DRIVER', default='ODBC Driver 18 for SQL Server'),
-            'extra_params': env('DB_EXTRA_PARAMS', default='TrustServerCertificate=yes;'),
-        },
+# Base de datos: motor seleccionable con DB_ENGINE (mysql | mssql) en backend/.env.
+# El destino final es SQL Server 2022 en Docker (ver docker-compose.yml); se deja
+# el soporte de MySQL activo hasta confirmar la migración completa de datos.
+if env('DB_ENGINE', default='mysql') == 'mssql':
+    DATABASES = {
+        'default': {
+            'ENGINE': 'mssql',
+            'NAME': env('MSSQL_NAME', default='sgsi_iso27001'),
+            'HOST': env('MSSQL_HOST', default='127.0.0.1'),
+            'PORT': env('MSSQL_PORT', default='1433'),
+            'USER': env('MSSQL_USER', default='sa'),
+            'PASSWORD': env('MSSQL_SA_PASSWORD', default=''),
+            'OPTIONS': {
+                'driver': 'ODBC Driver 18 for SQL Server',
+                'extra_params': 'TrustServerCertificate=yes;Encrypt=yes',
+            },
+        }
     }
-}
-
-# Si DB_USER está vacío se usa autenticación integrada de Windows (Trusted_Connection).
-if not env('DB_USER', default=''):
-    DATABASES['default']['OPTIONS']['extra_params'] += 'Trusted_Connection=yes;'
-    DATABASES['default'].pop('USER', None)
-    DATABASES['default'].pop('PASSWORD', None)
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.mysql',
+            'NAME': env('DB_NAME', default='sgsi_iso27001'),
+            'HOST': env('DB_HOST', default='127.0.0.1'),
+            'PORT': env('DB_PORT', default='3306'),
+            'USER': env('DB_USER', default='root'),
+            'PASSWORD': env('DB_PASSWORD', default=''),
+            'OPTIONS': {
+                'charset': 'utf8mb4',
+            },
+        }
+    }
 
 AUTH_USER_MODEL = 'accounts.Usuario'
 
@@ -103,8 +122,22 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
+# En desarrollo, whitenoise sirve directo desde los directorios static/ de cada app
+# (sin depender de collectstatic para ver cambios al instante).
+WHITENOISE_USE_FINDERS = DEBUG
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -113,6 +146,20 @@ CORS_ALLOWED_ORIGINS = env.list(
     'CORS_ALLOWED_ORIGINS',
     default=['http://localhost:5173', 'http://127.0.0.1:5173'],
 )
+
+# Correo: usado para enviar códigos OTP por email. Sin EMAIL_HOST_USER configurado,
+# los correos se imprimen en la consola del servidor (útil en desarrollo).
+if env('EMAIL_HOST_USER', default=''):
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+    EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+    EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+    EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+    DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER)
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'sgsi@localhost'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -128,11 +175,14 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 25,
+    # 500 cubre con margen los ~200 activos actuales y el crecimiento esperado.
+    'PAGE_SIZE': 500,
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
+    # Alineado con el cierre de sesión por inactividad del frontend (5 min):
+    # un access token robado o abandonado deja de servir a los pocos minutos.
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=5),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
     'ROTATE_REFRESH_TOKENS': True,
     'BLACKLIST_AFTER_ROTATION': True,

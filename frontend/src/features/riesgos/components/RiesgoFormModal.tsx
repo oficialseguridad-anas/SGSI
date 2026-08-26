@@ -55,7 +55,7 @@ export function RiesgoFormModal({ open, riesgo, onClose }: Props) {
         descripcion: riesgo.descripcion,
         probabilidad: riesgo.probabilidad,
         impacto: riesgo.impacto,
-        propietario_riesgo: riesgo.propietario_riesgo,
+        propietario_riesgo: riesgo.propietario_riesgo ?? undefined,
         controles: riesgo.controles,
         esta_activo: riesgo.esta_activo,
       });

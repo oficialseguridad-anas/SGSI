@@ -31,11 +31,29 @@ class UsuarioManager(BaseUserManager):
 class Usuario(AbstractUser):
     username = None
     email = models.EmailField('email', unique=True)
-    nombre_completo = models.CharField(max_length=150)
+    nombre_completo = models.CharField(max_length=150, db_column='nombreCompleto')
     cargo = models.CharField(max_length=100, blank=True)
-    area = models.CharField(max_length=100, blank=True)
+    direccion = models.ForeignKey(
+        'activos.Direccion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='usuarios',
+        verbose_name='Dirección',
+        db_column='direccionId',
+    )
     telefono = models.CharField(max_length=30, blank=True)
-    debe_cambiar_password = models.BooleanField(default=False)
+    debe_cambiar_password = models.BooleanField(default=False, db_column='debeCambiarPassword')
+
+    class MetodoOtp(models.TextChoices):
+        APP = 'APP', 'Aplicación de autenticación'
+        EMAIL = 'EMAIL', 'Correo electrónico'
+
+    otp_secreto = models.CharField(max_length=32, blank=True, db_column='otpSecreto')
+    otp_habilitado = models.BooleanField(default=False, db_column='otpHabilitado')
+    otp_metodo = models.CharField(
+        max_length=10, choices=MetodoOtp.choices, default=MetodoOtp.APP, db_column='otpMetodo'
+    )
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = []
@@ -45,6 +63,7 @@ class Usuario(AbstractUser):
     class Meta:
         verbose_name = 'usuario'
         verbose_name_plural = 'usuarios'
+        db_table = 'usuario'
 
     def __str__(self):
         return self.email
@@ -55,31 +74,40 @@ class Usuario(AbstractUser):
 
 
 class Rol(TimeStampedModel):
-    grupo = models.OneToOneField(Group, on_delete=models.CASCADE, related_name='rol')
+    grupo = models.OneToOneField(Group, on_delete=models.CASCADE, related_name='rol', db_column='grupoId')
     nombre = models.CharField(max_length=100, unique=True)
     descripcion = models.TextField(blank=True)
-    es_rol_sistema = models.BooleanField(default=False)
+    es_rol_sistema = models.BooleanField(default=False, db_column='esRolSistema')
 
     class Meta:
         verbose_name = 'rol'
         verbose_name_plural = 'roles'
+        db_table = 'rol'
 
     def __str__(self):
         return self.nombre
 
 
 class UsuarioRol(models.Model):
-    usuario = models.ForeignKey(Usuario, on_delete=models.CASCADE, related_name='usuario_roles')
-    rol = models.ForeignKey(Rol, on_delete=models.CASCADE, related_name='usuario_roles')
-    fecha_asignacion = models.DateTimeField(auto_now_add=True)
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.CASCADE, related_name='usuario_roles', db_column='usuarioId'
+    )
+    rol = models.ForeignKey(Rol, on_delete=models.CASCADE, related_name='usuario_roles', db_column='rolId')
+    fecha_asignacion = models.DateTimeField(auto_now_add=True, db_column='fechaAsignacion')
     asignado_por = models.ForeignKey(
-        Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='roles_asignados'
+        Usuario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='roles_asignados',
+        db_column='asignadoPorId',
     )
 
     class Meta:
         unique_together = ('usuario', 'rol')
         verbose_name = 'rol de usuario'
         verbose_name_plural = 'roles de usuario'
+        db_table = 'usuarioRol'
 
     def __str__(self):
         return f'{self.usuario} - {self.rol}'
@@ -94,6 +122,43 @@ class UsuarioRol(models.Model):
         usuario.groups.remove(grupo)
 
 
+class CodigoRecuperacionOtp(models.Model):
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.CASCADE, related_name='codigos_recuperacion_otp', db_column='usuarioId'
+    )
+    codigo_hash = models.CharField(max_length=128, db_column='codigoHash')
+    usado = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True, db_column='creadoEn')
+    usado_en = models.DateTimeField(null=True, blank=True, db_column='usadoEn')
+
+    class Meta:
+        verbose_name = 'código de recuperación OTP'
+        verbose_name_plural = 'códigos de recuperación OTP'
+        db_table = 'codigoRecuperacionOtp'
+
+    def __str__(self):
+        return f'{self.usuario} - {"usado" if self.usado else "disponible"}'
+
+
+class CodigoOtpCorreo(models.Model):
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.CASCADE, related_name='codigos_otp_correo', db_column='usuarioId'
+    )
+    codigo_hash = models.CharField(max_length=128, db_column='codigoHash')
+    expira_en = models.DateTimeField(db_column='expiraEn')
+    usado = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True, db_column='creadoEn')
+
+    class Meta:
+        verbose_name = 'código OTP por correo'
+        verbose_name_plural = 'códigos OTP por correo'
+        ordering = ['-creado_en']
+        db_table = 'codigoOtpCorreo'
+
+    def __str__(self):
+        return f'{self.usuario} - {"usado" if self.usado else "vigente"}'
+
+
 class BitacoraAcceso(models.Model):
     class TipoEvento(models.TextChoices):
         LOGIN = 'LOGIN', 'Inicio de sesión'
@@ -101,18 +166,19 @@ class BitacoraAcceso(models.Model):
         LOGIN_FALLIDO = 'LOGIN_FALLIDO', 'Intento fallido'
 
     usuario = models.ForeignKey(
-        Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='accesos'
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='accesos', db_column='usuarioId'
     )
-    email_intentado = models.EmailField(blank=True)
+    email_intentado = models.EmailField(blank=True, db_column='emailIntentado')
     timestamp = models.DateTimeField(auto_now_add=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
-    user_agent = models.CharField(max_length=300, blank=True)
-    tipo_evento = models.CharField(max_length=20, choices=TipoEvento.choices)
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_column='ipAddress')
+    user_agent = models.CharField(max_length=300, blank=True, db_column='userAgent')
+    tipo_evento = models.CharField(max_length=20, choices=TipoEvento.choices, db_column='tipoEvento')
 
     class Meta:
         verbose_name = 'registro de acceso'
         verbose_name_plural = 'bitácora de accesos'
         ordering = ['-timestamp']
+        db_table = 'bitacoraAcceso'
 
     def __str__(self):
         return f'{self.tipo_evento} - {self.usuario or self.email_intentado} - {self.timestamp}'
@@ -127,21 +193,22 @@ class BitacoraAccion(models.Model):
         CLOSE = 'CLOSE', 'Cierre'
 
     usuario = models.ForeignKey(
-        Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='acciones'
+        Usuario, on_delete=models.SET_NULL, null=True, blank=True, related_name='acciones', db_column='usuarioId'
     )
     timestamp = models.DateTimeField(auto_now_add=True)
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.CharField(max_length=64)
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, db_column='contentTypeId')
+    object_id = models.CharField(max_length=64, db_column='objectId')
     content_object = GenericForeignKey('content_type', 'object_id')
     modulo = models.CharField(max_length=50)
     accion = models.CharField(max_length=20, choices=Accion.choices)
     detalle = models.JSONField(default=dict, blank=True)
-    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True, db_column='ipAddress')
 
     class Meta:
         verbose_name = 'registro de acción'
         verbose_name_plural = 'bitácora de acciones'
         ordering = ['-timestamp']
+        db_table = 'bitacoraAccion'
 
     def __str__(self):
         return f'{self.modulo}:{self.accion} - {self.usuario} - {self.timestamp}'

@@ -15,6 +15,15 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+// Endpoints de autenticación: un 401 aquí significa credenciales/código inválidos,
+// no una sesión expirada — no debe intentar refrescar el token ni redirigir a /login
+// (ya estamos ahí), sino dejar que el propio formulario muestre el error.
+const RUTAS_SIN_REINTENTO_DE_TOKEN = ['/auth/token/', '/auth/token/verificar-otp/', '/auth/token/refresh/'];
+
+function esRutaDeAutenticacion(url?: string): boolean {
+  return Boolean(url) && RUTAS_SIN_REINTENTO_DE_TOKEN.some((ruta) => url!.endsWith(ruta));
+}
+
 let refreshPromise: Promise<string> | null = null;
 
 async function refreshAccessToken(): Promise<string> {
@@ -32,7 +41,12 @@ apiClient.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
 
-    if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
+    if (
+      error.response?.status === 401 &&
+      originalRequest &&
+      !originalRequest._retry &&
+      !esRutaDeAutenticacion(originalRequest.url)
+    ) {
       originalRequest._retry = true;
       try {
         refreshPromise = refreshPromise ?? refreshAccessToken();

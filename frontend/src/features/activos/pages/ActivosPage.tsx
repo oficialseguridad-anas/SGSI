@@ -85,7 +85,13 @@ export function ActivosPage() {
   }
 
   const columns = [
-    { title: 'Código', dataIndex: 'codigo', key: 'codigo', width: 90 },
+    {
+      title: 'Código',
+      dataIndex: 'codigo',
+      key: 'codigo',
+      width: 90,
+      render: (codigo: string) => <strong>{codigo}</strong>,
+    },
     {
       title: 'Nombre', dataIndex: 'nombre', key: 'nombre', width: 220,
       onCell: () => ({ style: CELDA_AJUSTABLE }),

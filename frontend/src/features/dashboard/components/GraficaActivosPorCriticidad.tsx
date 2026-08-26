@@ -1,44 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { Button, Empty, Skeleton } from 'antd';
-import { useId, useMemo, useState } from 'react';
+import ReactECharts from 'echarts-for-react';
+import { useMemo, useState } from 'react';
 import { fetchActivos } from '../../activos/api';
 import type { NivelValoracion } from '../../activos/types';
 
 // Paleta de estado (nunca se tematiza): cada nivel de criticidad tiene un color
 // fijo validado contra confusión por daltonismo y contraste, con su etiqueta de
 // texto siempre visible al lado — el color nunca es el único portador del dato.
-const ESTILO: Record<NivelValoracion, { color: string; etiqueta: string }> = {
-  BAJA: { color: '#0ca30c', etiqueta: 'Baja' },
-  MEDIA: { color: '#fab219', etiqueta: 'Media' },
-  ALTA: { color: '#d03b3b', etiqueta: 'Alta' },
+const ESTILO: Record<NivelValoracion, { color: string; claro: string; etiqueta: string }> = {
+  BAJA: { color: '#0ca30c', claro: '#6fd66f', etiqueta: 'Baja' },
+  MEDIA: { color: '#e0a300', claro: '#ffd666', etiqueta: 'Media' },
+  ALTA: { color: '#d03b3b', claro: '#f18b8b', etiqueta: 'Alta' },
 };
 const ORDEN: NivelValoracion[] = ['BAJA', 'MEDIA', 'ALTA'];
-
-const ALTO_PLOT = 160;
-const ANCHO_BARRA = 64;
-const GAP_BARRA = 48;
-const PAD_LATERAL = 32;
-const ANCHO_SVG = PAD_LATERAL * 2 + ANCHO_BARRA * 3 + GAP_BARRA * 2;
-const Y_BASE = ALTO_PLOT + 24;
-
-function rutaBarra(x: number, alturaBarra: number): string {
-  const yTop = Y_BASE - alturaBarra;
-  const r = Math.min(4, alturaBarra / 2);
-  if (alturaBarra <= 0) return '';
-  return `M ${x} ${Y_BASE}
-    L ${x} ${yTop + r}
-    Q ${x} ${yTop} ${x + r} ${yTop}
-    L ${x + ANCHO_BARRA - r} ${yTop}
-    Q ${x + ANCHO_BARRA} ${yTop} ${x + ANCHO_BARRA} ${yTop + r}
-    L ${x + ANCHO_BARRA} ${Y_BASE}
-    Z`;
-}
 
 export function GraficaActivosPorCriticidad() {
   const { data, isLoading } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
   const [vistaTabla, setVistaTabla] = useState(false);
-  const [resaltado, setResaltado] = useState<NivelValoracion | null>(null);
-  const idBase = useId();
 
   const conteos = useMemo(() => {
     const base: Record<NivelValoracion, number> = { BAJA: 0, MEDIA: 0, ALTA: 0 };
@@ -49,7 +28,88 @@ export function GraficaActivosPorCriticidad() {
   }, [data]);
 
   const total = conteos.BAJA + conteos.MEDIA + conteos.ALTA;
-  const maximo = Math.max(1, conteos.BAJA, conteos.MEDIA, conteos.ALTA);
+
+  const opcionGrafica = useMemo(
+    () => ({
+      animationDuration: 900,
+      animationEasing: 'elasticOut' as const,
+      tooltip: {
+        trigger: 'item' as const,
+        backgroundColor: 'rgba(17,17,17,0.92)',
+        borderWidth: 0,
+        padding: [8, 12],
+        textStyle: { color: '#fff', fontSize: 13 },
+        formatter: (p: { name: string; value: number; percent: number }) =>
+          `<strong>${p.value}</strong> activos · ${p.name} (${p.percent}%)`,
+      },
+      legend: {
+        bottom: 2,
+        icon: 'circle' as const,
+        itemWidth: 10,
+        itemHeight: 10,
+        itemGap: 18,
+        textStyle: { color: '#52514e', fontSize: 12 },
+        formatter: (name: string) => {
+          const nivel = ORDEN.find((n) => ESTILO[n].etiqueta === name);
+          return nivel ? `${name}  ${conteos[nivel]}` : name;
+        },
+      },
+      series: [
+        {
+          name: 'Activos por criticidad',
+          type: 'pie' as const,
+          radius: ['56%', '80%'],
+          center: ['50%', '44%'],
+          avoidLabelOverlap: true,
+          label: { show: false },
+          labelLine: { show: false },
+          itemStyle: {
+            borderRadius: 10,
+            borderColor: '#fff',
+            borderWidth: 3,
+            shadowBlur: 14,
+            shadowColor: 'rgba(11,11,11,0.16)',
+          },
+          emphasis: {
+            scale: true,
+            scaleSize: 6,
+            itemStyle: { shadowBlur: 22, shadowColor: 'rgba(11,11,11,0.32)' },
+          },
+          data: ORDEN.map((nivel) => ({
+            name: ESTILO[nivel].etiqueta,
+            value: conteos[nivel],
+            itemStyle: {
+              color: {
+                type: 'radial' as const,
+                x: 0.5,
+                y: 0.5,
+                r: 0.9,
+                colorStops: [
+                  { offset: 0, color: ESTILO[nivel].claro },
+                  { offset: 1, color: ESTILO[nivel].color },
+                ],
+              },
+            },
+          })),
+        },
+      ],
+      graphic: [
+        {
+          type: 'text' as const,
+          left: 'center' as const,
+          top: '36%',
+          style: { text: String(total), fontSize: 34, fontWeight: 700, fill: '#0b0b0b' },
+        },
+        {
+          type: 'text' as const,
+          left: 'center' as const,
+          top: '46%',
+          style: { text: 'activos', fontSize: 13, fill: '#898781' },
+        },
+      ],
+    }),
+    [conteos, total],
+  );
 
   if (isLoading) {
     return <Skeleton active paragraph={{ rows: 4 }} />;
@@ -101,78 +161,11 @@ export function GraficaActivosPorCriticidad() {
           </tbody>
         </table>
       ) : (
-        <div style={{ position: 'relative' }}>
-          <svg
-            viewBox={`0 0 ${ANCHO_SVG} ${Y_BASE + 28}`}
-            width="100%"
-            style={{ maxWidth: 360, display: 'block', margin: '0 auto' }}
-            role="img"
-            aria-label={`Activos por criticidad: ${ORDEN.map((n) => `${ESTILO[n].etiqueta} ${conteos[n]}`).join(', ')}`}
-          >
-            {/* línea base */}
-            <line x1={PAD_LATERAL - 8} y1={Y_BASE} x2={ANCHO_SVG - PAD_LATERAL + 8} y2={Y_BASE} stroke="#c3c2b7" strokeWidth={1} />
-
-            {ORDEN.map((nivel, i) => {
-              const x = PAD_LATERAL + i * (ANCHO_BARRA + GAP_BARRA);
-              const conteo = conteos[nivel];
-              const alturaBarra = (conteo / maximo) * ALTO_PLOT;
-              const activo = resaltado === nivel;
-              return (
-                <g
-                  key={nivel}
-                  style={{ cursor: 'pointer' }}
-                  onMouseEnter={() => setResaltado(nivel)}
-                  onMouseLeave={() => setResaltado(null)}
-                  onFocus={() => setResaltado(nivel)}
-                  onBlur={() => setResaltado(null)}
-                  tabIndex={0}
-                  role="button"
-                  aria-describedby={`${idBase}-tt-${nivel}`}
-                >
-                  {/* área de impacto ampliada para el hover/foco */}
-                  <rect x={x - 4} y={Y_BASE - ALTO_PLOT - 24} width={ANCHO_BARRA + 8} height={ALTO_PLOT + 24} fill="transparent" />
-                  <path d={rutaBarra(x, alturaBarra)} fill={ESTILO[nivel].color} opacity={activo ? 1 : 0.9} />
-                  <text
-                    x={x + ANCHO_BARRA / 2}
-                    y={Y_BASE - alturaBarra - 10}
-                    textAnchor="middle"
-                    fontSize={14}
-                    fontWeight={600}
-                    fill="#0b0b0b"
-                  >
-                    {conteo}
-                  </text>
-                  <text x={x + ANCHO_BARRA / 2} y={Y_BASE + 20} textAnchor="middle" fontSize={13} fill="#52514e">
-                    {ESTILO[nivel].etiqueta}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-
-          {resaltado && (
-            <div
-              id={`${idBase}-tt-${resaltado}`}
-              role="tooltip"
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#0b0b0b',
-                color: '#fff',
-                padding: '4px 10px',
-                borderRadius: 4,
-                fontSize: 12,
-                whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-              }}
-            >
-              <strong>{conteos[resaltado]}</strong> activos · {ESTILO[resaltado].etiqueta} (
-              {total ? Math.round((conteos[resaltado] / total) * 100) : 0}%)
-            </div>
-          )}
-        </div>
+        <ReactECharts
+          option={opcionGrafica}
+          style={{ height: 260, width: '100%' }}
+          aria-label={`Activos por criticidad: ${ORDEN.map((n) => `${ESTILO[n].etiqueta} ${conteos[n]}`).join(', ')}`}
+        />
       )}
     </div>
   );

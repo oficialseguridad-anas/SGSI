@@ -6,6 +6,8 @@ import { UsuariosPage } from './features/accounts/pages/UsuariosPage';
 import { ActivosPage } from './features/activos/pages/ActivosPage';
 import { ControlesPage } from './features/controles/pages/ControlesPage';
 import { DocumentosPage } from './features/documentos/pages/DocumentosPage';
+import { IndicadoresPage } from './features/indicadores/pages/IndicadoresPage';
+import { ObjetivosPage } from './features/objetivos/pages/ObjetivosPage';
 import { RiesgosPage } from './features/riesgos/pages/RiesgosPage';
 import { AdminRoute } from './shared/layout/AdminRoute';
 import { PrivateRoute } from './shared/layout/PrivateRoute';
@@ -22,6 +24,8 @@ export default function App() {
           <Route path="/riesgos" element={<RiesgosPage />} />
           <Route path="/controles" element={<ControlesPage />} />
           <Route path="/documentos" element={<DocumentosPage />} />
+          <Route path="/indicadores" element={<IndicadoresPage />} />
+          <Route path="/objetivos" element={<ObjetivosPage />} />
           <Route element={<AdminRoute />}>
             <Route path="/usuarios" element={<UsuariosPage />} />
           </Route>

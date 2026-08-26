@@ -1,7 +1,9 @@
 import {
+  AimOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
+  LineChartOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
@@ -38,7 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   {
     key: 'controles',
     path: '/controles',
-    label: 'Controles',
+    label: 'Controles (SoA)',
     icon: <SafetyCertificateOutlined />,
     perm: 'controles.view_aplicabilidadcontrol',
   },
@@ -48,6 +50,20 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Documentos',
     icon: <FileTextOutlined />,
     perm: 'documentos.view_documento',
+  },
+  {
+    key: 'indicadores',
+    path: '/indicadores',
+    label: 'Indicadores',
+    icon: <LineChartOutlined />,
+    perm: 'indicadores.view_indicador',
+  },
+  {
+    key: 'objetivos',
+    path: '/objetivos',
+    label: 'Objetivos',
+    icon: <AimOutlined />,
+    perm: 'objetivos.view_objetivo',
   },
   { key: 'usuarios', path: '/usuarios', label: 'Usuarios', icon: <TeamOutlined />, adminOnly: true },
   { key: 'seguridad', path: '/seguridad', label: 'Seguridad', icon: <SafetyOutlined /> },
@@ -82,6 +98,7 @@ export function Shell() {
         trigger={null}
         breakpoint="lg"
         collapsedWidth={0}
+        style={{ position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}
       >
         <div
           style={{

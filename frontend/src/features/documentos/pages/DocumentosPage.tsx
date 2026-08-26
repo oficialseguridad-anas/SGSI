@@ -49,7 +49,12 @@ export function DocumentosPage() {
   }
 
   const columns = [
-    { title: 'Código', dataIndex: 'codigo', key: 'codigo' },
+    {
+      title: 'Código',
+      dataIndex: 'codigo',
+      key: 'codigo',
+      render: (codigo: string) => <strong>{codigo}</strong>,
+    },
     { title: 'Título', dataIndex: 'titulo', key: 'titulo' },
     {
       title: 'Tipo',
