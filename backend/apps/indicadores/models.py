@@ -139,6 +139,15 @@ class Indicador(TimeStampedModel):
         return coincidencia.group(1).strip(), coincidencia.group(2).strip()
 
 
+def ruta_soporte_seguimiento(instance, nombre_archivo):
+    """indicadores/seguimientos/<año actual>/<código del indicador>/<archivo> — se usa el
+    año de la subida (no el del periodo del seguimiento), y el código del indicador porque
+    es el identificador que usan las personas para ubicar la evidencia."""
+    anio = timezone.localdate().year
+    codigo = instance.indicador.codigo
+    return f'indicadores/seguimientos/{anio}/{codigo}/{nombre_archivo}'
+
+
 class SeguimientoIndicador(TimeStampedModel):
     """Registro de medición/seguimiento de un indicador para un periodo, según su frecuencia."""
 
@@ -159,8 +168,8 @@ class SeguimientoIndicador(TimeStampedModel):
     )
     observaciones = models.TextField(blank=True, verbose_name='Observaciones')
     archivo_soporte = models.FileField(
-        upload_to='indicadores/seguimientos/%Y/%m/', blank=True, verbose_name='Archivo soporte',
-        db_column='archivoSoporte',
+        upload_to=ruta_soporte_seguimiento, blank=True, verbose_name='Archivo soporte',
+        db_column='archivoSoporte', max_length=255,
         validators=[validar_extension_archivo, validar_tamano_archivo],
     )
 

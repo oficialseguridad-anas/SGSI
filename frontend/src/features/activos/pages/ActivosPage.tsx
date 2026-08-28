@@ -2,6 +2,8 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
 import { useMemo, useState, type CSSProperties } from 'react';
+import { useAuth } from '../../../app/AuthContext';
+import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { ActivoFormModal } from '../components/ActivoFormModal';
 import { eliminarActivo, fetchActivos, fetchProcesos } from '../api';
 import type { Activo, ClaseActivo, EstadoActivo, EtiquetadoActivo, NivelValoracion, TipoActivo } from '../types';
@@ -49,8 +51,9 @@ const OPCIONES_CRITICIDAD = [
 ];
 
 export function ActivosPage() {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
   const { data: procesos } = useQuery({ queryKey: ['procesos'], queryFn: fetchProcesos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [activoEditando, setActivoEditando] = useState<Activo | null>(null);
@@ -155,15 +158,19 @@ export function ActivosPage() {
       width: 140,
       render: (_: unknown, activo: Activo) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(activo)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este activo?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(activo.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('activos.change_activo') && (
+            <Button size="small" onClick={() => abrirEditar(activo)}>Editar</Button>
+          )}
+          {hasPerm('activos.delete_activo') && (
+            <Popconfirm
+              title="¿Eliminar este activo?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(activo.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -172,8 +179,13 @@ export function ActivosPage() {
   return (
     <Card
       title="Activos de información"
-      extra={<Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo activo</Button>}
+      extra={
+        hasPerm('activos.add_activo') && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo activo</Button>
+        )
+      }
     >
+      <ErrorCarga visible={isError} entidad="los activos" />
       <Space style={{ marginBottom: 16 }} wrap>
         <Select
           placeholder="Buscar por proceso"

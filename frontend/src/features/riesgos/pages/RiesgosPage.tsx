@@ -2,6 +2,8 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
+import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { GestionarTratamientoModal } from '../components/GestionarTratamientoModal';
 import { MapaCalorRiesgosModal } from '../components/MapaCalorRiesgosModal';
 import { PrevisualizarEvidenciasModal } from '../components/PrevisualizarEvidenciasModal';
@@ -23,8 +25,9 @@ function ultimoTratamientoDe(riesgo: Riesgo) {
 }
 
 export function RiesgosPage() {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['riesgos'], queryFn: fetchRiesgos });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['riesgos'], queryFn: fetchRiesgos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [riesgoEditando, setRiesgoEditando] = useState<Riesgo | null>(null);
   const [mapaCalorAbierto, setMapaCalorAbierto] = useState(false);
@@ -181,15 +184,19 @@ export function RiesgosPage() {
       width: 140,
       render: (_: unknown, riesgo: Riesgo) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(riesgo)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este riesgo?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(riesgo.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('riesgos.change_riesgo') && (
+            <Button size="small" onClick={() => abrirEditar(riesgo)}>Editar</Button>
+          )}
+          {hasPerm('riesgos.delete_riesgo') && (
+            <Popconfirm
+              title="¿Eliminar este riesgo?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(riesgo.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -201,10 +208,13 @@ export function RiesgosPage() {
       extra={
         <Space>
           <Button onClick={() => setMapaCalorAbierto(true)}>Ver mapa de calor</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo riesgo</Button>
+          {hasPerm('riesgos.add_riesgo') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo riesgo</Button>
+          )}
         </Space>
       }
     >
+      <ErrorCarga visible={isError} entidad="los riesgos" />
       <Table
         rowKey="id"
         loading={isLoading}

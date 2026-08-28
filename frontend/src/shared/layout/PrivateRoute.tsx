@@ -19,12 +19,10 @@ export function PrivateRoute() {
   }
 
   // Cuenta marcada para cambio obligatorio de contraseña: bloquea cualquier otra
-  // pantalla hasta que la cambie (y evita el redirect inverso una vez ya está ahí).
+  // pantalla hasta que la cambie. Fuera de ese caso, /cambiar-password también es
+  // accesible voluntariamente (opción "Cambiar contraseña" del menú de usuario).
   if (user?.debe_cambiar_password && location.pathname !== '/cambiar-password') {
     return <Navigate to="/cambiar-password" replace />;
-  }
-  if (!user?.debe_cambiar_password && location.pathname === '/cambiar-password') {
-    return <Navigate to="/" replace />;
   }
 
   return <Outlet />;

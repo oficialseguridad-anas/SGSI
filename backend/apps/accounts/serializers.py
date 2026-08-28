@@ -105,3 +105,27 @@ class CambiarPasswordSerializer(serializers.Serializer):
         if not usuario.check_password(attrs['password_actual']):
             raise serializers.ValidationError({'password_actual': 'Contraseña actual incorrecta.'})
         return attrs
+
+
+class SolicitarRecuperacionPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate_email(self, value):
+        if not Usuario.objects.filter(email__iexact=value, is_active=True).exists():
+            raise serializers.ValidationError('Este correo no está registrado.')
+        return value
+
+
+class ConfirmarRecuperacionPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    codigo = serializers.CharField()
+    password_nueva = serializers.CharField()
+
+    def validate(self, attrs):
+        try:
+            usuario = Usuario.objects.get(email__iexact=attrs['email'], is_active=True)
+        except Usuario.DoesNotExist:
+            raise serializers.ValidationError({'email': 'Este correo no está registrado.'})
+        validate_password(attrs['password_nueva'], user=usuario)
+        attrs['usuario'] = usuario
+        return attrs

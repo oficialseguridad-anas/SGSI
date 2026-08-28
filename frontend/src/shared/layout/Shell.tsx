@@ -3,6 +3,7 @@ import {
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
+  KeyOutlined,
   LineChartOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -144,9 +145,15 @@ export function Shell() {
           <Dropdown
             menu={{
               items: [
+                { key: 'cambiar-password', icon: <KeyOutlined />, label: 'Cambiar contraseña' },
+                { type: 'divider' },
                 { key: 'logout', icon: <LogoutOutlined />, label: 'Cerrar sesión' },
               ],
-              onClick: () => {
+              onClick: ({ key }) => {
+                if (key === 'cambiar-password') {
+                  navigate('/cambiar-password');
+                  return;
+                }
                 logout();
                 navigate('/login');
               },

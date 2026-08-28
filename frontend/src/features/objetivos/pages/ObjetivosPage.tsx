@@ -2,14 +2,17 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Popconfirm, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
+import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { GestionarActividadesModal } from '../components/GestionarActividadesModal';
 import { ObjetivoFormModal } from '../components/ObjetivoFormModal';
 import { eliminarObjetivo, fetchObjetivos } from '../api';
 import type { Objetivo } from '../types';
 
 export function ObjetivosPage() {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['objetivos'], queryFn: fetchObjetivos });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['objetivos'], queryFn: fetchObjetivos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [objetivoEditando, setObjetivoEditando] = useState<Objetivo | null>(null);
   const [actividadesModalAbierto, setActividadesModalAbierto] = useState(false);
@@ -145,15 +148,19 @@ export function ObjetivosPage() {
       width: 120,
       render: (_: unknown, objetivo: Objetivo) => (
         <Space direction="vertical" size={4}>
-          <Button size="small" onClick={() => abrirEditar(objetivo)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este objetivo?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(objetivo.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('objetivos.change_objetivo') && (
+            <Button size="small" onClick={() => abrirEditar(objetivo)}>Editar</Button>
+          )}
+          {hasPerm('objetivos.delete_objetivo') && (
+            <Popconfirm
+              title="¿Eliminar este objetivo?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(objetivo.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -163,11 +170,14 @@ export function ObjetivosPage() {
     <Card
       title="Objetivos del SGSI"
       extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
-          Nuevo objetivo
-        </Button>
+        hasPerm('objetivos.add_objetivo') && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
+            Nuevo objetivo
+          </Button>
+        )
       }
     >
+      <ErrorCarga visible={isError} entidad="los objetivos" />
       <Table
         rowKey="id"
         loading={isLoading}

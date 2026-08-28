@@ -90,6 +90,15 @@ class ActividadObjetivo(TimeStampedModel):
         return self.EstadoEjecucion.PENDIENTE
 
 
+def ruta_soporte_actividad(instance, nombre_archivo):
+    """objetivos/actividades/<año actual>/objetivo-<id del objetivo>/<archivo> — se usa el
+    año de la subida (no el del plazo de la actividad), y el id del objetivo porque no
+    existe un código de negocio para objetivos, a diferencia de riesgos/indicadores."""
+    anio = timezone.localdate().year
+    objetivo_id = instance.actividad.objetivo_id
+    return f'objetivos/actividades/{anio}/objetivo-{objetivo_id}/{nombre_archivo}'
+
+
 class ArchivoAdjuntoActividad(models.Model):
     """Uno de los posibles varios archivos adjuntos como soporte de una actividad."""
 
@@ -97,7 +106,7 @@ class ArchivoAdjuntoActividad(models.Model):
         ActividadObjetivo, on_delete=models.CASCADE, related_name='archivos_adjuntos', db_column='actividadId'
     )
     archivo = models.FileField(
-        upload_to='objetivos/actividades/%Y/%m/', verbose_name='Archivo',
+        upload_to=ruta_soporte_actividad, verbose_name='Archivo', max_length=255,
         validators=[validar_extension_archivo, validar_tamano_archivo],
     )
     subido_en = models.DateTimeField(auto_now_add=True, db_column='subidoEn')

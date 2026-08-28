@@ -1,3 +1,4 @@
+import { Button, Modal, Typography } from 'antd';
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { cerrarSesion, fetchMe, login as loginRequest, verificarOtp } from '../features/accounts/api';
@@ -6,7 +7,14 @@ import { refreshAccessToken } from '../shared/api/client';
 import { tokenStorage } from '../shared/api/tokenStorage';
 
 const INACTIVIDAD_LIMITE_MS = 5 * 60 * 1000;
-const EVENTOS_ACTIVIDAD = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+// Se avisa 1 minuto antes de cerrar la sesión, en vez de cerrarla en silencio: sin
+// esto, un formulario abierto mientras el usuario busca un archivo en el selector
+// nativo del sistema operativo (que no genera eventos en la página) perdía la sesión
+// sin ningún aviso, y el guardado fallaba después con un error genérico.
+const AVISO_ANTES_DE_CERRAR_MS = 60 * 1000;
+// 'focus': recuperar el foco de la pestaña (p.ej. al cerrar el selector de archivos)
+// también cuenta como actividad — es exactamente el caso que perdía la sesión.
+const EVENTOS_ACTIVIDAD = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'click', 'focus'];
 
 interface AuthContextValue {
   user: Me | null;
@@ -24,8 +32,11 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [avisoInactividad, setAvisoInactividad] = useState(false);
   const navigate = useNavigate();
-  const inactividadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const avisoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cierreTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reiniciarTemporizadorRef = useRef<() => void>(() => {});
 
   async function loadSession() {
     // El access token vive solo en memoria: al recargar la página siempre está vacío,
@@ -86,26 +97,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return Boolean(user?.is_superuser || user?.permisos.includes(perm));
   }
 
-  // Cierra la sesión automáticamente si no hay actividad del usuario (mouse,
-  // teclado, scroll) durante INACTIVIDAD_LIMITE_MS.
+  // Cierra la sesión automáticamente si no hay actividad del usuario durante
+  // INACTIVIDAD_LIMITE_MS, pero avisando AVISO_ANTES_DE_CERRAR_MS antes — un
+  // formulario con cambios sin guardar ya no se pierde en silencio.
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setAvisoInactividad(false);
+      return;
+    }
 
     function cerrarPorInactividad() {
+      setAvisoInactividad(false);
       logout();
       navigate('/login?motivo=inactividad', { replace: true });
     }
 
-    function reiniciarTemporizador() {
-      if (inactividadTimer.current) clearTimeout(inactividadTimer.current);
-      inactividadTimer.current = setTimeout(cerrarPorInactividad, INACTIVIDAD_LIMITE_MS);
+    function mostrarAviso() {
+      setAvisoInactividad(true);
+      cierreTimer.current = setTimeout(cerrarPorInactividad, AVISO_ANTES_DE_CERRAR_MS);
     }
 
+    function reiniciarTemporizador() {
+      setAvisoInactividad(false);
+      if (avisoTimer.current) clearTimeout(avisoTimer.current);
+      if (cierreTimer.current) clearTimeout(cierreTimer.current);
+      avisoTimer.current = setTimeout(mostrarAviso, INACTIVIDAD_LIMITE_MS - AVISO_ANTES_DE_CERRAR_MS);
+    }
+
+    reiniciarTemporizadorRef.current = reiniciarTemporizador;
     EVENTOS_ACTIVIDAD.forEach((evento) => window.addEventListener(evento, reiniciarTemporizador));
     reiniciarTemporizador();
 
     return () => {
-      if (inactividadTimer.current) clearTimeout(inactividadTimer.current);
+      if (avisoTimer.current) clearTimeout(avisoTimer.current);
+      if (cierreTimer.current) clearTimeout(cierreTimer.current);
       EVENTOS_ACTIVIDAD.forEach((evento) => window.removeEventListener(evento, reiniciarTemporizador));
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +150,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <Modal
+        open={avisoInactividad}
+        title="Tu sesión está por cerrarse"
+        closable={false}
+        maskClosable={false}
+        keyboard={false}
+        footer={[
+          <Button key="seguir" type="primary" onClick={() => reiniciarTemporizadorRef.current()}>
+            Seguir conectado
+          </Button>,
+        ]}
+      >
+        <Typography.Paragraph>
+          Por seguridad, tu sesión se cerrará en menos de un minuto por inactividad. Si tienes cambios sin
+          guardar, haz clic en "Seguir conectado" para continuar.
+        </Typography.Paragraph>
+      </Modal>
     </AuthContext.Provider>
   );
 }

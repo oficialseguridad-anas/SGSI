@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Button, Card, Table, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
+import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { AplicabilidadFormModal } from '../components/AplicabilidadFormModal';
 import { fetchSoa } from '../api';
 import type { AplicabilidadControl, CategoriaControl, EstadoImplementacion } from '../types';
@@ -45,7 +47,8 @@ function esEncabezado(fila: FilaTabla): fila is FilaCategoria {
 }
 
 export function ControlesPage() {
-  const { data, isLoading } = useQuery({ queryKey: ['soa'], queryFn: fetchSoa });
+  const { hasPerm } = useAuth();
+  const { data, isLoading, isError } = useQuery({ queryKey: ['soa'], queryFn: fetchSoa });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [aplicabilidadEditando, setAplicabilidadEditando] = useState<AplicabilidadControl | null>(null);
 
@@ -161,14 +164,18 @@ export function ControlesPage() {
       title: 'Acciones',
       key: 'acciones',
       width: 90,
-      ...columnaConEncabezado('id', (_: unknown, aplicabilidad: AplicabilidadControl) => (
-        <Button size="small" onClick={() => abrirEditar(aplicabilidad)}>Editar</Button>
-      ), 8),
+      ...columnaConEncabezado('id', (_: unknown, aplicabilidad: AplicabilidadControl) =>
+        hasPerm('controles.change_aplicabilidadcontrol') ? (
+          <Button size="small" onClick={() => abrirEditar(aplicabilidad)}>Editar</Button>
+        ) : (
+          '—'
+        ), 8),
     },
   ];
 
   return (
     <Card title="Controles Anexo A — Declaración de Aplicabilidad (SoA)">
+      <ErrorCarga visible={isError} entidad="los controles" />
       <Table
         rowKey={(fila: FilaTabla) => String(fila.id)}
         loading={isLoading}

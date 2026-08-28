@@ -1,6 +1,7 @@
 import { LockOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Form, Input, Typography, message } from 'antd';
 import { useState, type SyntheticEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../app/AuthContext';
 import { BRAND, LOGO_SRC } from '../../../shared/theme/brand';
 import { cambiarPassword } from '../api';
@@ -16,7 +17,9 @@ interface FormValues {
 }
 
 export function CambiarPasswordPage() {
-  const { refreshUser, logout } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
+  const navigate = useNavigate();
+  const esObligatorio = Boolean(user?.debe_cambiar_password);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +30,7 @@ export function CambiarPasswordPage() {
       await cambiarPassword(values.password_actual, values.password_nueva);
       message.success('Contraseña actualizada correctamente.');
       await refreshUser();
+      navigate('/', { replace: true });
     } catch (err) {
       const detalle =
         (err as { response?: { data?: { password_actual?: string[]; password_nueva?: string[] } } }).response?.data;
@@ -78,10 +82,12 @@ export function CambiarPasswordPage() {
       >
         <Card style={{ width: 380, borderTop: `3px solid ${BRAND.orange}` }} styles={{ body: { paddingTop: 20 } }}>
           <Typography.Title level={4} style={{ marginTop: 0 }}>
-            Debes cambiar tu contraseña
+            {esObligatorio ? 'Debes cambiar tu contraseña' : 'Cambiar contraseña'}
           </Typography.Title>
           <Typography.Paragraph type="secondary">
-            Por seguridad, tu cuenta requiere una nueva contraseña antes de continuar.
+            {esObligatorio
+              ? 'Por seguridad, tu cuenta requiere una nueva contraseña antes de continuar.'
+              : 'Ingresa tu contraseña actual y la nueva contraseña que quieras usar.'}
           </Typography.Paragraph>
           {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
           <Form layout="vertical" onFinish={onFinish} disabled={loading}>
@@ -127,9 +133,15 @@ export function CambiarPasswordPage() {
                 Cambiar contraseña
               </Button>
             </Form.Item>
-            <Button type="link" block onClick={() => logout()}>
-              Cerrar sesión
-            </Button>
+            {esObligatorio ? (
+              <Button type="link" block onClick={() => logout()}>
+                Cerrar sesión
+              </Button>
+            ) : (
+              <Button type="link" block onClick={() => navigate(-1)}>
+                Cancelar
+              </Button>
+            )}
           </Form>
         </Card>
       </div>

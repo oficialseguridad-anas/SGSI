@@ -2,6 +2,8 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
+import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { GestionarSeguimientoModal } from '../components/GestionarSeguimientoModal';
 import { IndicadorFormModal } from '../components/IndicadorFormModal';
 import { eliminarIndicador, fetchIndicadores } from '../api';
@@ -30,8 +32,9 @@ const NOMBRE_FRECUENCIA: Record<FrecuenciaIndicador, string> = {
 };
 
 export function IndicadoresPage() {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['indicadores'], queryFn: fetchIndicadores });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['indicadores'], queryFn: fetchIndicadores });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [indicadorEditando, setIndicadorEditando] = useState<Indicador | null>(null);
   const [seguimientoModalAbierto, setSeguimientoModalAbierto] = useState(false);
@@ -185,15 +188,19 @@ export function IndicadoresPage() {
       width: 120,
       render: (_: unknown, indicador: Indicador) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(indicador)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este indicador?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(indicador.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('indicadores.change_indicador') && (
+            <Button size="small" onClick={() => abrirEditar(indicador)}>Editar</Button>
+          )}
+          {hasPerm('indicadores.delete_indicador') && (
+            <Popconfirm
+              title="¿Eliminar este indicador?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(indicador.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -203,11 +210,14 @@ export function IndicadoresPage() {
     <Card
       title="Indicadores del SGSI"
       extra={
-        <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
-          Nuevo indicador
-        </Button>
+        hasPerm('indicadores.add_indicador') && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
+            Nuevo indicador
+          </Button>
+        )
       }
     >
+      <ErrorCarga visible={isError} entidad="los indicadores" />
       <Table
         rowKey="id"
         loading={isLoading}

@@ -159,6 +159,29 @@ class CodigoOtpCorreo(models.Model):
         return f'{self.usuario} - {"usado" if self.usado else "vigente"}'
 
 
+class CodigoRecuperacionPassword(models.Model):
+    """Código de un solo uso enviado por correo para restablecer la contraseña —
+    independiente de CodigoOtpCorreo (2FA de login): un código para iniciar sesión
+    nunca debería servir para fijar una contraseña nueva, ni viceversa."""
+
+    usuario = models.ForeignKey(
+        Usuario, on_delete=models.CASCADE, related_name='codigos_recuperacion_password', db_column='usuarioId'
+    )
+    codigo_hash = models.CharField(max_length=128, db_column='codigoHash')
+    expira_en = models.DateTimeField(db_column='expiraEn')
+    usado = models.BooleanField(default=False)
+    creado_en = models.DateTimeField(auto_now_add=True, db_column='creadoEn')
+
+    class Meta:
+        verbose_name = 'código de recuperación de contraseña'
+        verbose_name_plural = 'códigos de recuperación de contraseña'
+        ordering = ['-creado_en']
+        db_table = 'codigoRecuperacionPassword'
+
+    def __str__(self):
+        return f'{self.usuario} - {"usado" if self.usado else "vigente"}'
+
+
 class BitacoraAcceso(models.Model):
     class TipoEvento(models.TextChoices):
         LOGIN = 'LOGIN', 'Inicio de sesión'

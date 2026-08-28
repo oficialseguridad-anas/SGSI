@@ -2,6 +2,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
 import { eliminarActividad, fetchActividades } from '../api';
 import type { ActividadObjetivo, Objetivo } from '../types';
 import { ActividadFormModal } from './ActividadFormModal';
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
   const [actividadEditando, setActividadEditando] = useState<ActividadObjetivo | null>(null);
@@ -123,15 +125,19 @@ export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
       width: 140,
       render: (_: unknown, actividad: ActividadObjetivo) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(actividad)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar esta actividad?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(actividad.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('objetivos.change_actividadobjetivo') && (
+            <Button size="small" onClick={() => abrirEditar(actividad)}>Editar</Button>
+          )}
+          {hasPerm('objetivos.delete_actividadobjetivo') && (
+            <Popconfirm
+              title="¿Eliminar esta actividad?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(actividad.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -147,11 +153,13 @@ export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
         width={1300}
         destroyOnHidden
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
-            Agregar actividad
-          </Button>
-        </div>
+        {hasPerm('objetivos.add_actividadobjetivo') && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
+              Agregar actividad
+            </Button>
+          </div>
+        )}
         <Table
           rowKey="id"
           loading={isLoading}

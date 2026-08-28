@@ -2,6 +2,7 @@ import { PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
 import { descargarArchivo, nombreDeArchivo } from '../../../shared/api/descargarArchivo';
 import { eliminarSeguimiento, fetchSeguimientos } from '../api';
 import { COLOR_CUMPLIMIENTO, NOMBRE_CUMPLIMIENTO } from '../formula';
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
   const [seguimientoEditando, setSeguimientoEditando] = useState<SeguimientoIndicador | null>(null);
@@ -101,15 +103,19 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
       key: 'acciones',
       render: (_: unknown, seguimiento: SeguimientoIndicador) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(seguimiento)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este seguimiento?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(seguimiento.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('indicadores.change_seguimientoindicador') && (
+            <Button size="small" onClick={() => abrirEditar(seguimiento)}>Editar</Button>
+          )}
+          {hasPerm('indicadores.delete_seguimientoindicador') && (
+            <Popconfirm
+              title="¿Eliminar este seguimiento?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(seguimiento.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -125,11 +131,13 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
         width={1100}
         destroyOnHidden
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
-            Agregar seguimiento
-          </Button>
-        </div>
+        {hasPerm('indicadores.add_seguimientoindicador') && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
+              Agregar seguimiento
+            </Button>
+          </div>
+        )}
         <Table
           rowKey="id"
           loading={isLoading}

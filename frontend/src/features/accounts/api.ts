@@ -34,6 +34,18 @@ export async function cambiarPassword(passwordActual: string, passwordNueva: str
   });
 }
 
+export async function solicitarRecuperacionPassword(email: string) {
+  await apiClient.post('/auth/password/solicitar/', { email });
+}
+
+export async function confirmarRecuperacionPassword(email: string, codigo: string, passwordNueva: string) {
+  await apiClient.post('/auth/password/confirmar/', {
+    email,
+    codigo,
+    password_nueva: passwordNueva,
+  });
+}
+
 export async function fetchUsuarios() {
   const { data } = await apiClient.get<{ results: Usuario[]; count: number }>('/usuarios/');
   return data;

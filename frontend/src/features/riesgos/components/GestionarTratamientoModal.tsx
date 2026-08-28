@@ -2,6 +2,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
 import { eliminarTratamiento, fetchTratamientos } from '../api';
 import { COLOR_NIVEL_RIESGO, NOMBRE_NIVEL_RIESGO, TEXTO_NIVEL_RIESGO } from '../nivelRiesgo';
 import type { Riesgo, TratamientoRiesgo } from '../types';
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export function GestionarTratamientoModal({ open, riesgo, onClose }: Props) {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
   const [tratamientoEditando, setTratamientoEditando] = useState<TratamientoRiesgo | null>(null);
@@ -150,15 +152,19 @@ export function GestionarTratamientoModal({ open, riesgo, onClose }: Props) {
       width: 140,
       render: (_: unknown, tratamiento: TratamientoRiesgo) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(tratamiento)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este tratamiento?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(tratamiento.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('riesgos.change_tratamientoriesgo') && (
+            <Button size="small" onClick={() => abrirEditar(tratamiento)}>Editar</Button>
+          )}
+          {hasPerm('riesgos.delete_tratamientoriesgo') && (
+            <Popconfirm
+              title="¿Eliminar este tratamiento?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(tratamiento.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -174,11 +180,13 @@ export function GestionarTratamientoModal({ open, riesgo, onClose }: Props) {
         width={1300}
         destroyOnHidden
       >
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
-            Agregar tratamiento
-          </Button>
-        </div>
+        {hasPerm('riesgos.add_tratamientoriesgo') && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
+              Agregar tratamiento
+            </Button>
+          </div>
+        )}
         <Table
           rowKey="id"
           loading={isLoading}

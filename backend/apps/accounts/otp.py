@@ -8,7 +8,7 @@ from django.core import signing
 from django.core.mail import send_mail
 from django.utils import timezone
 
-from .models import CodigoOtpCorreo, CodigoRecuperacionOtp, Usuario
+from .models import CodigoOtpCorreo, CodigoRecuperacionOtp, CodigoRecuperacionPassword, Usuario
 
 OTP_ISSUER = 'SGSI ISO 27001'
 PENDING_TOKEN_SALT = 'apps.accounts.otp.pending-2fa'
@@ -142,3 +142,44 @@ def verificar_segundo_factor(usuario, codigo):
     if usuario.otp_metodo == Usuario.MetodoOtp.EMAIL:
         return verificar_codigo_email(usuario, codigo) or verificar_codigo_recuperacion(usuario, codigo)
     return verificar_codigo_totp(usuario.otp_secreto, codigo) or verificar_codigo_recuperacion(usuario, codigo)
+
+
+def puede_reenviar_codigo_password(usuario):
+    ultimo = usuario.codigos_recuperacion_password.order_by('-creado_en').first()
+    if ultimo is None:
+        return True
+    segundos_transcurridos = (timezone.now() - ultimo.creado_en).total_seconds()
+    return segundos_transcurridos >= EMAIL_CODE_RESEND_COOLDOWN_SECONDS
+
+
+def enviar_codigo_recuperacion_password(usuario):
+    codigo = _generar_codigo_numerico()
+    CodigoRecuperacionPassword.objects.create(
+        usuario=usuario,
+        codigo_hash=_hash_codigo(codigo),
+        expira_en=timezone.now() + timezone.timedelta(minutes=EMAIL_CODE_TTL_MINUTES),
+    )
+    send_mail(
+        subject=f'Restablecer tu contraseña - {OTP_ISSUER}',
+        message=(
+            f'Recibimos una solicitud para restablecer tu contraseña.\n\n'
+            f'Tu código para continuar es: {codigo}\n\n'
+            f'Vence en {EMAIL_CODE_TTL_MINUTES} minutos. Si no lo solicitaste, ignora este mensaje: '
+            f'tu contraseña actual seguirá funcionando.'
+        ),
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        recipient_list=[usuario.email],
+    )
+
+
+def verificar_codigo_recuperacion_password(usuario, codigo):
+    if not codigo:
+        return False
+    codigo = codigo.strip()
+    ahora = timezone.now()
+    for entrada in usuario.codigos_recuperacion_password.filter(usado=False, expira_en__gte=ahora):
+        if _codigo_coincide(codigo, entrada.codigo_hash):
+            entrada.usado = True
+            entrada.save(update_fields=['usado'])
+            return True
+    return False

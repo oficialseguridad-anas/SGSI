@@ -1,14 +1,25 @@
-import { LockOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
+import { LockOutlined, MailOutlined, SafetyOutlined, UserOutlined } from '@ant-design/icons';
 import { Alert, Button, Card, Divider, Form, Input, Typography, message } from 'antd';
 import { useState, type SyntheticEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../../app/AuthContext';
 import { BRAND, LOGO_SRC } from '../../../shared/theme/brand';
-import { reenviarOtp } from '../api';
+import { confirmarRecuperacionPassword, reenviarOtp, solicitarRecuperacionPassword } from '../api';
 import type { MetodoOtp } from '../types';
 
 function ocultarSiFallaLogo(evento: SyntheticEvent<HTMLImageElement>) {
   evento.currentTarget.style.display = 'none';
+}
+
+function extraerMensajeError(err: unknown, ...campos: string[]) {
+  const detalle = (err as { response?: { data?: Record<string, string[] | string> } }).response?.data;
+  if (!detalle) return null;
+  for (const campo of campos) {
+    const valor = detalle[campo];
+    if (Array.isArray(valor) && valor[0]) return valor[0];
+    if (typeof valor === 'string') return valor;
+  }
+  return null;
 }
 
 interface LoginFormValues {
@@ -18,6 +29,16 @@ interface LoginFormValues {
 
 interface OtpFormValues {
   codigo: string;
+}
+
+interface RecuperarEmailFormValues {
+  email: string;
+}
+
+interface RecuperarConfirmarFormValues {
+  codigo: string;
+  password_nueva: string;
+  password_confirmacion: string;
 }
 
 export function LoginPage() {
@@ -30,6 +51,8 @@ export function LoginPage() {
   const [otpToken, setOtpToken] = useState<string | null>(null);
   const [metodo, setMetodo] = useState<MetodoOtp | null>(null);
   const [reenviando, setReenviando] = useState(false);
+  const [pasoRecuperacion, setPasoRecuperacion] = useState<'email' | 'codigo' | null>(null);
+  const [emailRecuperacion, setEmailRecuperacion] = useState('');
 
   async function onFinishCredenciales(values: LoginFormValues) {
     setError(null);
@@ -73,6 +96,49 @@ export function LoginPage() {
       message.error('No se pudo reenviar el código. Espera unos segundos e intenta de nuevo.');
     } finally {
       setReenviando(false);
+    }
+  }
+
+  function abrirRecuperarPassword() {
+    setError(null);
+    setPasoRecuperacion('email');
+  }
+
+  function volverALogin() {
+    setError(null);
+    setPasoRecuperacion(null);
+    setEmailRecuperacion('');
+  }
+
+  async function onFinishSolicitarRecuperacion(values: RecuperarEmailFormValues) {
+    setError(null);
+    setLoading(true);
+    try {
+      await solicitarRecuperacionPassword(values.email);
+      setEmailRecuperacion(values.email);
+      setPasoRecuperacion('codigo');
+      message.success('Te enviamos un código a tu correo para restablecer tu contraseña.');
+    } catch (err) {
+      setError(extraerMensajeError(err, 'email') ?? 'No se pudo procesar la solicitud. Intenta de nuevo.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function onFinishConfirmarRecuperacion(values: RecuperarConfirmarFormValues) {
+    setError(null);
+    setLoading(true);
+    try {
+      await confirmarRecuperacionPassword(emailRecuperacion, values.codigo, values.password_nueva);
+      message.success('Tu contraseña fue restablecida. Ya puedes iniciar sesión.');
+      volverALogin();
+    } catch (err) {
+      setError(
+        extraerMensajeError(err, 'detail', 'codigo', 'password_nueva', 'email') ??
+          'No se pudo restablecer la contraseña. Intenta de nuevo.',
+      );
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -133,7 +199,7 @@ export function LoginPage() {
               </Typography.Text>
             </div>
           </div>
-        {!otpToken && cerradaPorInactividad && !error && (
+        {!otpToken && !pasoRecuperacion && cerradaPorInactividad && !error && (
           <Alert
             type="info"
             showIcon
@@ -143,7 +209,79 @@ export function LoginPage() {
         )}
         {error && <Alert type="error" message={error} style={{ marginBottom: 16 }} />}
 
-        {!otpToken ? (
+        {pasoRecuperacion === 'email' ? (
+          <Form layout="vertical" onFinish={onFinishSolicitarRecuperacion} disabled={loading}>
+            <Typography.Paragraph type="secondary">
+              Ingresa el email de tu cuenta y te enviaremos un código para restablecer tu contraseña.
+            </Typography.Paragraph>
+            <Form.Item
+              name="email"
+              label="Email"
+              rules={[{ required: true, message: 'Ingresa tu email' }, { type: 'email', message: 'Email inválido' }]}
+            >
+              <Input prefix={<MailOutlined />} autoComplete="username" autoFocus />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block loading={loading}>
+                Enviar código
+              </Button>
+            </Form.Item>
+            <Button type="link" block onClick={volverALogin}>
+              Volver a iniciar sesión
+            </Button>
+          </Form>
+        ) : pasoRecuperacion === 'codigo' ? (
+          <Form layout="vertical" onFinish={onFinishConfirmarRecuperacion} disabled={loading}>
+            <Typography.Paragraph type="secondary">
+              Te enviamos un código a <strong>{emailRecuperacion}</strong>. Ingrésalo junto con tu nueva contraseña.
+            </Typography.Paragraph>
+            <Form.Item
+              name="codigo"
+              label="Código de verificación"
+              rules={[{ required: true, message: 'Ingresa el código' }]}
+            >
+              <Input prefix={<SafetyOutlined />} autoComplete="one-time-code" autoFocus />
+            </Form.Item>
+            <Form.Item
+              name="password_nueva"
+              label="Contraseña nueva"
+              rules={[
+                { required: true, message: 'Ingresa la contraseña nueva' },
+                { min: 8, message: 'Debe tener al menos 8 caracteres' },
+              ]}
+              hasFeedback
+            >
+              <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
+            </Form.Item>
+            <Form.Item
+              name="password_confirmacion"
+              label="Confirmar contraseña nueva"
+              dependencies={['password_nueva']}
+              hasFeedback
+              rules={[
+                { required: true, message: 'Confirma la contraseña nueva' },
+                ({ getFieldValue }) => ({
+                  validator(_, value) {
+                    if (!value || getFieldValue('password_nueva') === value) {
+                      return Promise.resolve();
+                    }
+                    return Promise.reject(new Error('Las contraseñas no coinciden'));
+                  },
+                }),
+              ]}
+            >
+              <Input.Password prefix={<LockOutlined />} autoComplete="new-password" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" block loading={loading}>
+                Restablecer contraseña
+              </Button>
+            </Form.Item>
+            <Button type="link" block onClick={() => setPasoRecuperacion('email')}>
+              Volver
+            </Button>
+          </Form>
+        ) : !otpToken ? (
           <Form layout="vertical" onFinish={onFinishCredenciales} disabled={loading}>
             <Form.Item name="email" label="Email" rules={[{ required: true, message: 'Ingresa tu email' }]}>
               <Input prefix={<UserOutlined />} autoComplete="username" />
@@ -156,6 +294,9 @@ export function LoginPage() {
                 Iniciar sesión
               </Button>
             </Form.Item>
+            <Button type="link" block onClick={abrirRecuperarPassword}>
+              ¿Olvidaste tu contraseña?
+            </Button>
           </Form>
         ) : (
           <Form layout="vertical" onFinish={onFinishOtp} disabled={loading}>

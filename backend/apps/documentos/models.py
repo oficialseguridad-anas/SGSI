@@ -40,7 +40,7 @@ class Documento(TimeStampedModel):
         db_column='aprobadoPorId',
     )
     archivo = models.FileField(
-        upload_to='documentos/%Y/%m/', blank=True,
+        upload_to='documentos/%Y/%m/', blank=True, max_length=255,
         validators=[validar_extension_archivo, validar_tamano_archivo],
     )
     fecha_aprobacion = models.DateField(null=True, blank=True, db_column='fechaAprobacion')
@@ -63,7 +63,7 @@ class VersionDocumento(TimeStampedModel):
     version = models.CharField(max_length=10)
     cambios = models.TextField(blank=True)
     archivo = models.FileField(
-        upload_to='documentos/versiones/%Y/%m/', blank=True,
+        upload_to='documentos/versiones/%Y/%m/', blank=True, max_length=255,
         validators=[validar_extension_archivo, validar_tamano_archivo],
     )
     creado_por = models.ForeignKey(

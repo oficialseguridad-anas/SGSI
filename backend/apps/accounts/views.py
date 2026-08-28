@@ -18,11 +18,13 @@ from .serializers import (
     Activar2FASerializer,
     ActivarEmailOtpSerializer,
     CambiarPasswordSerializer,
+    ConfirmarRecuperacionPasswordSerializer,
     Desactivar2FASerializer,
     MeSerializer,
     ReenviarCodigoOtpSerializer,
     RolSerializer,
     Setup2FASerializer,
+    SolicitarRecuperacionPasswordSerializer,
     UsuarioCreateSerializer,
     UsuarioRolSerializer,
     UsuarioSerializer,
@@ -235,6 +237,50 @@ class CambiarPasswordView(APIView):
         usuario.set_password(serializer.validated_data['password_nueva'])
         usuario.debe_cambiar_password = False
         usuario.save(update_fields=['password', 'debe_cambiar_password'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SolicitarRecuperacionPasswordView(APIView):
+    """Paso 1 de "olvidé mi contraseña": recibe el correo, confirma que esté
+    registrado y le envía un código de un solo uso para continuar."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        serializer = SolicitarRecuperacionPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        usuario = Usuario.objects.get(email__iexact=serializer.validated_data['email'], is_active=True)
+        if not otp_utils.puede_reenviar_codigo_password(usuario):
+            return Response(
+                {'detail': 'Espera unos segundos antes de solicitar otro código.'},
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
+        otp_utils.enviar_codigo_recuperacion_password(usuario)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class ConfirmarRecuperacionPasswordView(APIView):
+    """Paso 2: valida el código enviado por correo y fija la contraseña nueva."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        serializer = ConfirmarRecuperacionPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        usuario = serializer.validated_data['usuario']
+        if not otp_utils.verificar_codigo_recuperacion_password(usuario, serializer.validated_data['codigo']):
+            return Response({'detail': 'Código de verificación inválido.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        usuario.set_password(serializer.validated_data['password_nueva'])
+        usuario.debe_cambiar_password = False
+        usuario.save(update_fields=['password', 'debe_cambiar_password'])
+        _registrar_acceso(request, usuario, usuario.email, BitacoraAcceso.TipoEvento.LOGIN)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

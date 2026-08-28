@@ -2,6 +2,8 @@ import { PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
 import { useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
+import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { DocumentoFormModal } from '../components/DocumentoFormModal';
 import { eliminarDocumento, fetchDocumentos } from '../api';
 import type { Documento, EstadoDocumento, TipoDocumento } from '../types';
@@ -24,8 +26,9 @@ const COLOR_ESTADO: Record<EstadoDocumento, string> = {
 };
 
 export function DocumentosPage() {
+  const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
-  const { data, isLoading } = useQuery({ queryKey: ['documentos'], queryFn: fetchDocumentos });
+  const { data, isLoading, isError } = useQuery({ queryKey: ['documentos'], queryFn: fetchDocumentos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [documentoEditando, setDocumentoEditando] = useState<Documento | null>(null);
 
@@ -76,15 +79,19 @@ export function DocumentosPage() {
       key: 'acciones',
       render: (_: unknown, documento: Documento) => (
         <Space>
-          <Button size="small" onClick={() => abrirEditar(documento)}>Editar</Button>
-          <Popconfirm
-            title="¿Eliminar este documento?"
-            okText="Eliminar"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => eliminarMutation.mutate(documento.id)}
-          >
-            <Button size="small" danger>Eliminar</Button>
-          </Popconfirm>
+          {hasPerm('documentos.change_documento') && (
+            <Button size="small" onClick={() => abrirEditar(documento)}>Editar</Button>
+          )}
+          {hasPerm('documentos.delete_documento') && (
+            <Popconfirm
+              title="¿Eliminar este documento?"
+              okText="Eliminar"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => eliminarMutation.mutate(documento.id)}
+            >
+              <Button size="small" danger>Eliminar</Button>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -93,8 +100,13 @@ export function DocumentosPage() {
   return (
     <Card
       title="Documentos"
-      extra={<Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo documento</Button>}
+      extra={
+        hasPerm('documentos.add_documento') && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo documento</Button>
+        )
+      }
     >
+      <ErrorCarga visible={isError} entidad="los documentos" />
       <Table
         rowKey="id"
         loading={isLoading}

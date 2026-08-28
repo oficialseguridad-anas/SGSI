@@ -5,6 +5,7 @@ from .views import (
     Activar2FAView,
     ActivarEmailOtpView,
     CambiarPasswordView,
+    ConfirmarRecuperacionPasswordView,
     Desactivar2FAView,
     EnviarCodigoEmailActivacionView,
     MeView,
@@ -14,6 +15,7 @@ from .views import (
     SgsiLogoutView,
     SgsiTokenObtainPairView,
     SgsiTokenRefreshView,
+    SolicitarRecuperacionPasswordView,
     UsuarioRolViewSet,
     UsuarioViewSet,
     VerificarOtpView,
@@ -32,6 +34,12 @@ urlpatterns = [
     path('auth/logout/', SgsiLogoutView.as_view(), name='logout'),
     path('auth/me/', MeView.as_view(), name='me'),
     path('auth/cambiar-password/', CambiarPasswordView.as_view(), name='cambiar_password'),
+    path(
+        'auth/password/solicitar/', SolicitarRecuperacionPasswordView.as_view(), name='password_recuperar_solicitar'
+    ),
+    path(
+        'auth/password/confirmar/', ConfirmarRecuperacionPasswordView.as_view(), name='password_recuperar_confirmar'
+    ),
     path('auth/2fa/setup/', Setup2FAView.as_view(), name='2fa_setup'),
     path('auth/2fa/activar/', Activar2FAView.as_view(), name='2fa_activar'),
     path('auth/2fa/email/enviar/', EnviarCodigoEmailActivacionView.as_view(), name='2fa_email_enviar'),

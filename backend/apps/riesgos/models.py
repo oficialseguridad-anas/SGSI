@@ -195,6 +195,16 @@ class TratamientoRiesgo(TimeStampedModel):
         )
 
 
+def ruta_soporte_tratamiento(instance, nombre_archivo):
+    """riesgos/tratamientos/<año actual>/<código del riesgo>/<archivo> — se usa el año
+    de la subida (no el de creación del tratamiento) porque es "carpeta del año
+    actual", y el código del riesgo en vez de su id porque es el identificador que
+    usan las personas para ubicar la evidencia."""
+    anio = timezone.localdate().year
+    codigo = instance.tratamiento.riesgo.codigo
+    return f'riesgos/tratamientos/{anio}/{codigo}/{nombre_archivo}'
+
+
 class ArchivoAdjuntoTratamiento(models.Model):
     """Uno de los posibles varios archivos adjuntos como evidencia de un tratamiento."""
 
@@ -202,7 +212,7 @@ class ArchivoAdjuntoTratamiento(models.Model):
         TratamientoRiesgo, on_delete=models.CASCADE, related_name='archivos_adjuntos', db_column='tratamientoId'
     )
     archivo = models.FileField(
-        upload_to='riesgos/tratamientos/%Y/%m/', verbose_name='Archivo',
+        upload_to=ruta_soporte_tratamiento, verbose_name='Archivo', max_length=255,
         validators=[validar_extension_archivo, validar_tamano_archivo],
     )
     subido_en = models.DateTimeField(auto_now_add=True, db_column='subidoEn')
