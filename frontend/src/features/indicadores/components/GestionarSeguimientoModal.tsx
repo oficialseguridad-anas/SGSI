@@ -2,7 +2,7 @@ import { PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
-import { descargarArchivo } from '../../../shared/api/descargarArchivo';
+import { descargarArchivo, nombreDeArchivo } from '../../../shared/api/descargarArchivo';
 import { eliminarSeguimiento, fetchSeguimientos } from '../api';
 import { COLOR_CUMPLIMIENTO, NOMBRE_CUMPLIMIENTO } from '../formula';
 import type { Indicador, SeguimientoIndicador } from '../types';
@@ -86,7 +86,7 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
             onClick={() =>
               descargarArchivo(
                 `/seguimientos-indicador/${seguimiento.id}/descargar/`,
-                archivo.split('/').pop() ?? 'archivo',
+                nombreDeArchivo(archivo),
               )
             }
           >

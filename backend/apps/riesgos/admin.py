@@ -33,24 +33,28 @@ class AmenazaAdmin(admin.ModelAdmin):
 class TratamientoRiesgoInline(admin.TabularInline):
     model = TratamientoRiesgo
     extra = 0
-    autocomplete_fields = ['responsable']
+    autocomplete_fields = ['responsables']
 
 
 @admin.register(Riesgo)
 class RiesgoAdmin(admin.ModelAdmin):
     list_display = [
         'codigo', 'lista_activos', 'amenaza', 'riesgo_inherente', 'nivel_de_riesgo_display',
-        'esta_activo', 'propietario_riesgo',
+        'esta_activo', 'lista_propietarios',
     ]
     list_filter = ['esta_activo', 'amenaza']
     search_fields = ['codigo', 'descripcion', 'activos__nombre']
-    autocomplete_fields = ['activos', 'amenaza', 'propietario_riesgo', 'controles']
+    autocomplete_fields = ['activos', 'amenaza', 'propietarios_riesgo', 'controles']
     readonly_fields = ['riesgo_inherente']
     inlines = [TratamientoRiesgoInline]
 
     @admin.display(description='Activos afectados')
     def lista_activos(self, obj):
         return ', '.join(a.codigo for a in obj.activos.all())
+
+    @admin.display(description='Propietarios del riesgo')
+    def lista_propietarios(self, obj):
+        return ', '.join(u.nombre_completo for u in obj.propietarios_riesgo.all())
 
     @admin.display(description='Nivel de riesgo')
     def nivel_de_riesgo_display(self, obj):
@@ -79,18 +83,22 @@ class TratamientoRiesgoAdminForm(forms.ModelForm):
 @admin.register(TratamientoRiesgo)
 class TratamientoRiesgoAdmin(admin.ModelAdmin):
     form = TratamientoRiesgoAdminForm
-    list_display = ['riesgo', 'opcion', 'estado', 'responsable', 'fecha_limite']
+    list_display = ['riesgo', 'opcion', 'estado', 'lista_responsables', 'fecha_limite']
     list_filter = ['opcion']
     search_fields = ['riesgo__codigo', 'descripcion']
-    autocomplete_fields = ['riesgo', 'responsable']
+    autocomplete_fields = ['riesgo', 'responsables']
     readonly_fields = ['archivos_existentes', 'riesgo_residual', 'nivel_de_riesgo_residual_display', 'estado']
     fields = [
         'riesgo', 'opcion', 'descripcion', 'accion_mitigacion', 'recursos_necesarios',
-        'responsable', 'fecha_limite', 'fecha_cierre', 'fecha_proximo_seguimiento',
+        'responsables', 'fecha_limite', 'fecha_cierre', 'fecha_proximo_seguimiento',
         'evidencias_esperadas', 'archivos_existentes', 'archivos_nuevos',
         'probabilidad_residual', 'impacto_residual', 'riesgo_residual', 'nivel_de_riesgo_residual_display',
         'estado',
     ]
+
+    @admin.display(description='Responsables')
+    def lista_responsables(self, obj):
+        return ', '.join(u.nombre_completo for u in obj.responsables.all())
 
     @admin.display(description='Nivel de riesgo residual')
     def nivel_de_riesgo_residual_display(self, obj):

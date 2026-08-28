@@ -21,23 +21,23 @@ class AmenazaViewSet(viewsets.ModelViewSet):
 
 
 class RiesgoViewSet(viewsets.ModelViewSet):
-    queryset = Riesgo.objects.select_related(
-        'amenaza', 'propietario_riesgo'
-    ).prefetch_related('activos', 'tratamientos', 'controles').all()
+    queryset = Riesgo.objects.select_related('amenaza').prefetch_related(
+        'activos', 'tratamientos', 'controles', 'propietarios_riesgo'
+    ).all()
     serializer_class = RiesgoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
-    filterset_fields = ['esta_activo', 'activos', 'amenaza', 'propietario_riesgo']
+    filterset_fields = ['esta_activo', 'activos', 'amenaza', 'propietarios_riesgo']
     search_fields = ['codigo', 'descripcion', 'activos__nombre']
     ordering_fields = ['riesgo_inherente', 'fecha_identificacion', 'codigo']
 
 
 class TratamientoRiesgoViewSet(viewsets.ModelViewSet):
-    queryset = TratamientoRiesgo.objects.select_related('riesgo', 'responsable').prefetch_related(
-        'archivos_adjuntos'
+    queryset = TratamientoRiesgo.objects.select_related('riesgo').prefetch_related(
+        'archivos_adjuntos', 'responsables'
     ).all()
     serializer_class = TratamientoRiesgoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
-    filterset_fields = ['riesgo', 'opcion', 'responsable']
+    filterset_fields = ['riesgo', 'opcion', 'responsables']
     ordering_fields = ['fecha_limite']
 
 

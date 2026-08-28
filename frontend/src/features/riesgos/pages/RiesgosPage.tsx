@@ -4,10 +4,23 @@ import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
 import { useState } from 'react';
 import { GestionarTratamientoModal } from '../components/GestionarTratamientoModal';
 import { MapaCalorRiesgosModal } from '../components/MapaCalorRiesgosModal';
+import { PrevisualizarEvidenciasModal } from '../components/PrevisualizarEvidenciasModal';
 import { RiesgoFormModal } from '../components/RiesgoFormModal';
 import { eliminarRiesgo, fetchRiesgos } from '../api';
+import {
+  COLOR_ESTADO_TRATAMIENTO,
+  NOMBRE_ESTADO_TRATAMIENTO,
+  TEXTO_ESTADO_TRATAMIENTO,
+} from '../estadoTratamiento';
 import { COLOR_NIVEL_RIESGO, NOMBRE_NIVEL_RIESGO, TEXTO_NIVEL_RIESGO } from '../nivelRiesgo';
 import type { Riesgo } from '../types';
+
+function ultimoTratamientoDe(riesgo: Riesgo) {
+  return riesgo.tratamientos.reduce<Riesgo['tratamientos'][number] | null>(
+    (mas_reciente, actual) => (!mas_reciente || actual.id > mas_reciente.id ? actual : mas_reciente),
+    null,
+  );
+}
 
 export function RiesgosPage() {
   const queryClient = useQueryClient();
@@ -17,6 +30,15 @@ export function RiesgosPage() {
   const [mapaCalorAbierto, setMapaCalorAbierto] = useState(false);
   const [tratamientoModalAbierto, setTratamientoModalAbierto] = useState(false);
   const [riesgoParaTratamiento, setRiesgoParaTratamiento] = useState<Riesgo | null>(null);
+  const [previsualizarAbierto, setPrevisualizarAbierto] = useState(false);
+  const [tratamientoParaPrevisualizar, setTratamientoParaPrevisualizar] = useState<Riesgo['tratamientos'][number] | null>(
+    null,
+  );
+
+  function abrirPrevisualizacion(tratamiento: Riesgo['tratamientos'][number]) {
+    setTratamientoParaPrevisualizar(tratamiento);
+    setPrevisualizarAbierto(true);
+  }
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarRiesgo,
@@ -75,11 +97,20 @@ export function RiesgosPage() {
       ),
     },
     {
-      title: 'Propietario',
-      dataIndex: 'propietario_nombre',
-      key: 'propietario_nombre',
-      width: 160,
-      render: (nombre: string | null) => nombre ?? '—  Sin asignar',
+      title: 'Propietarios',
+      dataIndex: 'propietarios_nombres',
+      key: 'propietarios_nombres',
+      width: 180,
+      render: (nombres: string[]) =>
+        nombres.length ? (
+          <Space size={[4, 4]} wrap>
+            {nombres.map((n) => (
+              <Tag key={n}>{n}</Tag>
+            ))}
+          </Space>
+        ) : (
+          'Sin asignar'
+        ),
     },
     {
       title: 'Activo',
@@ -105,17 +136,42 @@ export function RiesgosPage() {
       key: 'nivel_de_riesgo_residual',
       width: 170,
       render: (_: unknown, riesgo: Riesgo) => {
-        const ultimoTratamiento = riesgo.tratamientos.reduce<Riesgo['tratamientos'][number] | null>(
-          (mas_reciente, actual) => (!mas_reciente || actual.id > mas_reciente.id ? actual : mas_reciente),
-          null,
-        );
-        const nivel = ultimoTratamiento?.nivel_de_riesgo_residual;
+        const nivel = ultimoTratamientoDe(riesgo)?.nivel_de_riesgo_residual;
         return nivel ? (
           <Tag color={COLOR_NIVEL_RIESGO[nivel]} style={{ color: TEXTO_NIVEL_RIESGO[nivel], borderColor: 'transparent' }}>
             {NOMBRE_NIVEL_RIESGO[nivel]}
           </Tag>
         ) : (
           '—'
+        );
+      },
+    },
+    {
+      title: 'Estado del tratamiento',
+      key: 'estado_tratamiento',
+      width: 150,
+      render: (_: unknown, riesgo: Riesgo) => {
+        const tratamiento = ultimoTratamientoDe(riesgo);
+        const estado = tratamiento?.estado ?? 'SIN_TRATAMIENTO';
+        const esClicable = estado === 'COMPLETADO' && !!tratamiento;
+        return (
+          <div
+            role={esClicable ? 'button' : undefined}
+            onClick={esClicable ? () => abrirPrevisualizacion(tratamiento) : undefined}
+            title={esClicable ? 'Ver soporte(s) del tratamiento' : undefined}
+            style={{
+              background: COLOR_ESTADO_TRATAMIENTO[estado],
+              color: TEXTO_ESTADO_TRATAMIENTO[estado],
+              borderRadius: 4,
+              padding: '4px 10px',
+              textAlign: 'center',
+              fontWeight: 600,
+              fontSize: 12,
+              cursor: esClicable ? 'pointer' : 'default',
+            }}
+          >
+            {NOMBRE_ESTADO_TRATAMIENTO[estado]}
+          </div>
         );
       },
     },
@@ -155,7 +211,7 @@ export function RiesgosPage() {
         columns={columns}
         dataSource={data?.results ?? []}
         pagination={false}
-        scroll={{ x: 1400 }}
+        scroll={{ x: 1550 }}
       />
       <RiesgoFormModal open={modalAbierto} riesgo={riesgoEditando} onClose={() => setModalAbierto(false)} />
       <MapaCalorRiesgosModal open={mapaCalorAbierto} onClose={() => setMapaCalorAbierto(false)} />
@@ -163,6 +219,12 @@ export function RiesgosPage() {
         open={tratamientoModalAbierto}
         riesgo={riesgoParaTratamiento}
         onClose={() => setTratamientoModalAbierto(false)}
+      />
+      <PrevisualizarEvidenciasModal
+        open={previsualizarAbierto}
+        titulo="Soportes del tratamiento completado"
+        archivos={tratamientoParaPrevisualizar?.archivos_adjuntos ?? []}
+        onClose={() => setPrevisualizarAbierto(false)}
       />
     </Card>
   );

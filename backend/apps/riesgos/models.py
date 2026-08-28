@@ -66,14 +66,12 @@ class Riesgo(TimeStampedModel):
     riesgo_inherente = models.PositiveSmallIntegerField(
         editable=False, default=0, verbose_name='Riesgo inherente', db_column='riesgoInherente'
     )
-    propietario_riesgo = models.ForeignKey(
+    propietarios_riesgo = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT,
-        related_name='riesgos_propios',
-        null=True,
         blank=True,
-        verbose_name='Propietario del riesgo',
-        db_column='propietarioRiesgoId',
+        related_name='riesgos_propios',
+        verbose_name='Propietarios del riesgo',
+        db_table='riesgoPropietarios',
     )
     controles = models.ManyToManyField(
         'controles.Control', blank=True, related_name='riesgos', db_table='riesgoControles'
@@ -133,9 +131,12 @@ class TratamientoRiesgo(TimeStampedModel):
     recursos_necesarios = models.TextField(
         blank=True, verbose_name='Recursos necesarios', db_column='recursosNecesarios'
     )
-    responsable = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='tratamientos_asignados',
-        db_column='responsableId',
+    responsables = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='tratamientos_asignados',
+        verbose_name='Responsables',
+        db_table='tratamientoRiesgoResponsables',
     )
     fecha_limite = models.DateField(
         null=True, blank=True, verbose_name='Fecha límite (plazo)', db_column='fechaLimite'

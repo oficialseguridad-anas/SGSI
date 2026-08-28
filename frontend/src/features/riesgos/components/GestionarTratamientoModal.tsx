@@ -85,7 +85,22 @@ export function GestionarTratamientoModal({ open, riesgo, onClose }: Props) {
           '—'
         ),
     },
-    { title: 'Responsable', dataIndex: 'responsable_nombre', key: 'responsable_nombre', width: 160 },
+    {
+      title: 'Responsables',
+      dataIndex: 'responsables_nombres',
+      key: 'responsables_nombres',
+      width: 180,
+      render: (nombres: string[]) =>
+        nombres.length ? (
+          <Space size={[4, 4]} wrap>
+            {nombres.map((n) => (
+              <Tag key={n}>{n}</Tag>
+            ))}
+          </Space>
+        ) : (
+          '—'
+        ),
+    },
     { title: 'Fecha límite', dataIndex: 'fecha_limite', key: 'fecha_limite', width: 110 },
     {
       title: 'Riesgo residual',
@@ -170,7 +185,7 @@ export function GestionarTratamientoModal({ open, riesgo, onClose }: Props) {
           columns={columns}
           dataSource={data?.results ?? []}
           pagination={false}
-          scroll={{ x: 1350 }}
+          scroll={{ x: 1380 }}
           locale={{ emptyText: 'Este riesgo aún no tiene tratamiento registrado.' }}
         />
       </Modal>

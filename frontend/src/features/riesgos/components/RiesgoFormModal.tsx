@@ -55,7 +55,7 @@ export function RiesgoFormModal({ open, riesgo, onClose }: Props) {
         descripcion: riesgo.descripcion,
         probabilidad: riesgo.probabilidad,
         impacto: riesgo.impacto,
-        propietario_riesgo: riesgo.propietario_riesgo ?? undefined,
+        propietarios_riesgo: riesgo.propietarios_riesgo,
         controles: riesgo.controles,
         esta_activo: riesgo.esta_activo,
       });
@@ -63,6 +63,7 @@ export function RiesgoFormModal({ open, riesgo, onClose }: Props) {
       form.setFieldsValue({
         probabilidad: 3,
         impacto: 10,
+        propietarios_riesgo: [],
         controles: [],
         esta_activo: true,
       });
@@ -205,11 +206,12 @@ export function RiesgoFormModal({ open, riesgo, onClose }: Props) {
           </div>
         )}
         <Form.Item
-          name="propietario_riesgo"
-          label="Propietario del riesgo"
-          rules={[{ required: true, message: 'Selecciona un propietario' }]}
+          name="propietarios_riesgo"
+          label="Propietarios del riesgo"
+          rules={[{ required: true, message: 'Selecciona al menos un propietario' }]}
         >
           <Select
+            mode="multiple"
             showSearch
             optionFilterProp="label"
             options={usuarios?.results.map((u) => ({ value: u.id, label: `${u.nombre_completo} (${u.email})` }))}

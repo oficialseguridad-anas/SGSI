@@ -26,8 +26,8 @@ export interface TratamientoRiesgo {
   descripcion: string;
   accion_mitigacion: string;
   recursos_necesarios: string;
-  responsable: number;
-  responsable_nombre: string;
+  responsables: number[];
+  responsables_nombres: string[];
   fecha_limite: string | null;
   fecha_cierre: string | null;
   fecha_proximo_seguimiento: string | null;
@@ -46,7 +46,7 @@ export interface TratamientoRiesgoInput {
   descripcion: string;
   accion_mitigacion: string;
   recursos_necesarios: string;
-  responsable: number;
+  responsables: number[];
   fecha_limite: string | null;
   fecha_cierre: string | null;
   fecha_proximo_seguimiento: string | null;
@@ -67,8 +67,8 @@ export interface Riesgo {
   impacto: number;
   riesgo_inherente: number;
   nivel_de_riesgo: NivelDeRiesgo;
-  propietario_riesgo: number | null;
-  propietario_nombre: string | null;
+  propietarios_riesgo: number[];
+  propietarios_nombres: string[];
   controles: number[];
   esta_activo: boolean;
   fecha_identificacion: string;
@@ -82,7 +82,7 @@ export interface RiesgoInput {
   descripcion: string;
   probabilidad: number;
   impacto: number;
-  propietario_riesgo: number;
+  propietarios_riesgo: number[];
   controles: number[];
   esta_activo: boolean;
 }

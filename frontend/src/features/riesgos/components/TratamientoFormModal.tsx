@@ -4,7 +4,7 @@ import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Tag, Typogr
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { fetchUsuarios } from '../../accounts/api';
-import { descargarArchivo } from '../../../shared/api/descargarArchivo';
+import { descargarArchivo, nombreDeArchivo } from '../../../shared/api/descargarArchivo';
 import {
   actualizarTratamiento,
   crearTratamiento,
@@ -76,7 +76,7 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
         descripcion: tratamiento.descripcion,
         accion_mitigacion: tratamiento.accion_mitigacion,
         recursos_necesarios: tratamiento.recursos_necesarios,
-        responsable: tratamiento.responsable,
+        responsables: tratamiento.responsables,
         fecha_limite: tratamiento.fecha_limite ? dayjs(tratamiento.fecha_limite) : null,
         fecha_cierre: tratamiento.fecha_cierre ? dayjs(tratamiento.fecha_cierre) : null,
         fecha_proximo_seguimiento: tratamiento.fecha_proximo_seguimiento
@@ -87,7 +87,7 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
         impacto_residual: tratamiento.impacto_residual,
       });
     } else {
-      form.setFieldsValue({ opcion: 'MITIGAR' });
+      form.setFieldsValue({ opcion: 'MITIGAR', responsables: [] });
     }
   }, [open, tratamiento, form]);
 
@@ -162,11 +162,12 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
           <Input.TextArea rows={2} />
         </Form.Item>
         <Form.Item
-          name="responsable"
-          label="Responsable"
-          rules={[{ required: true, message: 'Selecciona un responsable' }]}
+          name="responsables"
+          label="Responsables"
+          rules={[{ required: true, message: 'Selecciona al menos un responsable' }]}
         >
           <Select
+            mode="multiple"
             showSearch
             optionFilterProp="label"
             options={usuarios?.results.map((u) => ({ value: u.id, label: `${u.nombre_completo} (${u.email})` }))}
@@ -234,11 +235,11 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
                     onClick={() =>
                       descargarArchivo(
                         `/archivos-adjuntos-tratamiento/${archivo.id}/descargar/`,
-                        archivo.archivo.split('/').pop() ?? 'archivo',
+                        nombreDeArchivo(archivo.archivo),
                       )
                     }
                   >
-                    {archivo.archivo.split('/').pop()}
+                    {nombreDeArchivo(archivo.archivo)}
                   </Typography.Link>
                   <Popconfirm
                     title="¿Eliminar este archivo?"

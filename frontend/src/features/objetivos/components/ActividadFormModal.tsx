@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Tag, Typography, Upload, message } from 'antd';
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
-import { descargarArchivo } from '../../../shared/api/descargarArchivo';
+import { descargarArchivo, nombreDeArchivo } from '../../../shared/api/descargarArchivo';
 import {
   actualizarActividad,
   crearActividad,
@@ -144,11 +144,11 @@ export function ActividadFormModal({ open, objetivo, actividad, onClose }: Props
                     onClick={() =>
                       descargarArchivo(
                         `/archivos-adjuntos-actividad/${archivo.id}/descargar/`,
-                        archivo.archivo.split('/').pop() ?? 'archivo',
+                        nombreDeArchivo(archivo.archivo),
                       )
                     }
                   >
-                    {archivo.archivo.split('/').pop()}
+                    {nombreDeArchivo(archivo.archivo)}
                   </Typography.Link>
                   <Popconfirm
                     title="¿Eliminar este archivo?"
