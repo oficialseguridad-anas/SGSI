@@ -4,6 +4,7 @@ import { Button, DatePicker, Form, Input, Modal, Popconfirm, Select, Tag, Typogr
 import dayjs from 'dayjs';
 import { useEffect, useState } from 'react';
 import { fetchUsuarios } from '../../accounts/api';
+import { descargarArchivo } from '../../../shared/api/descargarArchivo';
 import {
   actualizarTratamiento,
   crearTratamiento,
@@ -21,12 +22,17 @@ const OPCIONES_OPCION = [
   { value: 'ACEPTAR', label: 'Aceptar' },
 ];
 
-const OPCIONES_ESTADO = [
-  { value: 'PENDIENTE', label: 'Pendiente' },
-  { value: 'EN_PROGRESO', label: 'En progreso' },
-  { value: 'COMPLETADO', label: 'Completado' },
-  { value: 'VENCIDO', label: 'Vencido' },
-];
+const COLOR_ESTADO: Record<TratamientoRiesgo['estado'], string> = {
+  PENDIENTE: 'default',
+  VENCIDO: 'red',
+  COMPLETADO: 'green',
+};
+
+const NOMBRE_ESTADO: Record<TratamientoRiesgo['estado'], string> = {
+  PENDIENTE: 'Pendiente',
+  VENCIDO: 'Vencido',
+  COMPLETADO: 'Completado',
+};
 
 type FormValues = Omit<
   TratamientoRiesgoInput,
@@ -79,10 +85,9 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
         evidencias_esperadas: tratamiento.evidencias_esperadas,
         probabilidad_residual: tratamiento.probabilidad_residual,
         impacto_residual: tratamiento.impacto_residual,
-        estado: tratamiento.estado,
       });
     } else {
-      form.setFieldsValue({ opcion: 'MITIGAR', estado: 'PENDIENTE' });
+      form.setFieldsValue({ opcion: 'MITIGAR' });
     }
   }, [open, tratamiento, form]);
 
@@ -224,9 +229,17 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
               {archivosExistentes.map((archivo) => (
                 <li key={archivo.id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <PaperClipOutlined />
-                  <a href={archivo.archivo} target="_blank" rel="noreferrer" style={{ flex: 1 }}>
+                  <Typography.Link
+                    style={{ flex: 1 }}
+                    onClick={() =>
+                      descargarArchivo(
+                        `/archivos-adjuntos-tratamiento/${archivo.id}/descargar/`,
+                        archivo.archivo.split('/').pop() ?? 'archivo',
+                      )
+                    }
+                  >
                     {archivo.archivo.split('/').pop()}
-                  </a>
+                  </Typography.Link>
                   <Popconfirm
                     title="¿Eliminar este archivo?"
                     okText="Eliminar"
@@ -253,9 +266,12 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
             <Button icon={<UploadOutlined />}>Agregar archivos</Button>
           </Upload>
         </Form.Item>
-        <Form.Item name="estado" label="Estado" rules={[{ required: true }]}>
-          <Select options={OPCIONES_ESTADO} />
-        </Form.Item>
+        {tratamiento && (
+          <Typography.Text type="secondary">
+            Estado (automático, según la fecha límite y las evidencias cargadas):{' '}
+            <Tag color={COLOR_ESTADO[tratamiento.estado]}>{NOMBRE_ESTADO[tratamiento.estado]}</Tag>
+          </Typography.Text>
+        )}
       </Form>
     </Modal>
   );

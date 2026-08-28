@@ -8,14 +8,13 @@ import type { EstadoTratamiento } from '../../riesgos/types';
 type Clave = EstadoTratamiento | 'SIN_TRATAMIENTO';
 
 // Orden fijo validado con el skill de dataviz (separa rojo/verde para que no queden
-// adyacentes — juntos no superan el umbral de daltonismo). No es un orden narrativo
-// estricto de severidad, es el orden que pasa la validación de contraste.
-const ORDEN: Clave[] = ['SIN_TRATAMIENTO', 'COMPLETADO', 'EN_PROGRESO', 'PENDIENTE', 'VENCIDO'];
+// adyacentes — juntos no superan el umbral de daltonismo, ΔE 8.7). No es un orden
+// narrativo estricto de severidad, es el orden que pasa la validación de contraste.
+const ORDEN: Clave[] = ['SIN_TRATAMIENTO', 'COMPLETADO', 'PENDIENTE', 'VENCIDO'];
 
 const NOMBRE: Record<Clave, string> = {
   SIN_TRATAMIENTO: 'Sin tratamiento',
   COMPLETADO: 'Completado',
-  EN_PROGRESO: 'En progreso',
   PENDIENTE: 'Pendiente',
   VENCIDO: 'Vencido',
 };
@@ -23,17 +22,15 @@ const NOMBRE: Record<Clave, string> = {
 // Mismos colores que la columna "Estado" de la tabla de gestión de tratamiento.
 const COLOR: Record<Clave, string> = {
   SIN_TRATAMIENTO: '#52514e',
-  COMPLETADO: '#0ca30c',
-  EN_PROGRESO: '#2a78d6',
+  COMPLETADO: '#008300',
   PENDIENTE: '#898781',
-  VENCIDO: '#d03b3b',
+  VENCIDO: '#e34948',
 };
 const CLARO: Record<Clave, string> = {
   SIN_TRATAMIENTO: '#c3c2b7',
   COMPLETADO: '#6fd66f',
-  EN_PROGRESO: '#9ec5f4',
   PENDIENTE: '#dedcd4',
-  VENCIDO: '#f18b8b',
+  VENCIDO: '#f3a5a4',
 };
 
 export function GraficaRiesgosTratamiento() {

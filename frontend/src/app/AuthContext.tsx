@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchMe, invalidarRefreshToken, login as loginRequest, verificarOtp } from '../features/accounts/api';
+import { cerrarSesion, fetchMe, login as loginRequest, verificarOtp } from '../features/accounts/api';
 import type { LoginResultado, Me } from '../features/accounts/types';
+import { refreshAccessToken } from '../shared/api/client';
 import { tokenStorage } from '../shared/api/tokenStorage';
 
 const INACTIVIDAD_LIMITE_MS = 5 * 60 * 1000;
@@ -27,11 +28,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const inactividadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function loadSession() {
-    if (!tokenStorage.getAccess()) {
-      setIsLoading(false);
-      return;
-    }
+    // El access token vive solo en memoria: al recargar la página siempre está vacío,
+    // así que el arranque intenta un refresco silencioso con la cookie httpOnly. Si no
+    // hay cookie (o expiró), el refresco falla y queda como no autenticado, sin error.
     try {
+      await refreshAccessToken();
       const me = await fetchMe();
       setUser(me);
     } catch {
@@ -51,15 +52,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ('requiere_otp' in resultado) {
       return resultado;
     }
-    tokenStorage.setTokens(resultado.access, resultado.refresh);
+    // El refresh token ya quedó en la cookie httpOnly (la puso el backend en la
+    // respuesta); acá solo guardamos el access token, en memoria.
+    tokenStorage.setAccess(resultado.access);
     const me = await fetchMe();
     setUser(me);
     return resultado;
   }
 
   async function completarLoginOtp(otpToken: string, codigo: string) {
-    const { access, refresh } = await verificarOtp(otpToken, codigo);
-    tokenStorage.setTokens(access, refresh);
+    const { access } = await verificarOtp(otpToken, codigo);
+    tokenStorage.setAccess(access);
     const me = await fetchMe();
     setUser(me);
   }
@@ -70,15 +73,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    const refresh = tokenStorage.getRefresh();
     tokenStorage.clear();
     setUser(null);
-    if (refresh) {
-      try {
-        await invalidarRefreshToken(refresh);
-      } catch {
-        // Best-effort: la sesión local ya quedó cerrada aunque esta llamada falle.
-      }
+    try {
+      await cerrarSesion();
+    } catch {
+      // Best-effort: la sesión local ya quedó cerrada aunque esta llamada falle.
     }
   }
 

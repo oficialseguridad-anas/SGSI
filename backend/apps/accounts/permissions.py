@@ -8,6 +8,20 @@ class EsAdministrador(BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_superuser)
 
 
+class PuedeVerUsuarios(BasePermission):
+    """Leer (listar/ver) usuarios solo exige el permiso Django accounts.view_usuario —
+    así se puede asignar a un grupo/rol (p.ej. para elegir el propietario de un riesgo
+    o el responsable de un tratamiento) sin abrir la gestión completa de usuarios.
+    Crear, editar o eliminar usuarios sigue reservado a superusuarios."""
+
+    def has_permission(self, request, view):
+        if not (request.user and request.user.is_authenticated):
+            return False
+        if request.method in SAFE_METHODS:
+            return request.user.has_perm('accounts.view_usuario')
+        return request.user.is_superuser
+
+
 class EsPropietarioOTienePermiso(BasePermission):
     """
     Permite la escritura si el usuario es el propietario del objeto (campo `propietario`)

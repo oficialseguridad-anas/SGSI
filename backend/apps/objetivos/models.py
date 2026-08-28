@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.models import TimeStampedModel
+from apps.core.validators import validar_extension_archivo, validar_tamano_archivo
 
 
 class Objetivo(TimeStampedModel):
@@ -95,7 +96,10 @@ class ArchivoAdjuntoActividad(models.Model):
     actividad = models.ForeignKey(
         ActividadObjetivo, on_delete=models.CASCADE, related_name='archivos_adjuntos', db_column='actividadId'
     )
-    archivo = models.FileField(upload_to='objetivos/actividades/%Y/%m/', verbose_name='Archivo')
+    archivo = models.FileField(
+        upload_to='objetivos/actividades/%Y/%m/', verbose_name='Archivo',
+        validators=[validar_extension_archivo, validar_tamano_archivo],
+    )
     subido_en = models.DateTimeField(auto_now_add=True, db_column='subidoEn')
 
     class Meta:

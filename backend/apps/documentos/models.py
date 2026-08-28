@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+from apps.core.validators import validar_extension_archivo, validar_tamano_archivo
 
 
 class Documento(TimeStampedModel):
@@ -38,7 +39,10 @@ class Documento(TimeStampedModel):
         related_name='documentos_aprobados',
         db_column='aprobadoPorId',
     )
-    archivo = models.FileField(upload_to='documentos/%Y/%m/', blank=True)
+    archivo = models.FileField(
+        upload_to='documentos/%Y/%m/', blank=True,
+        validators=[validar_extension_archivo, validar_tamano_archivo],
+    )
     fecha_aprobacion = models.DateField(null=True, blank=True, db_column='fechaAprobacion')
     fecha_proxima_revision = models.DateField(null=True, blank=True, db_column='fechaProximaRevision')
 
@@ -58,7 +62,10 @@ class VersionDocumento(TimeStampedModel):
     )
     version = models.CharField(max_length=10)
     cambios = models.TextField(blank=True)
-    archivo = models.FileField(upload_to='documentos/versiones/%Y/%m/', blank=True)
+    archivo = models.FileField(
+        upload_to='documentos/versiones/%Y/%m/', blank=True,
+        validators=[validar_extension_archivo, validar_tamano_archivo],
+    )
     creado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,

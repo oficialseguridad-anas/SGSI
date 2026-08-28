@@ -18,13 +18,20 @@ export async function reenviarOtp(otpToken: string) {
   await apiClient.post('/auth/token/reenviar-otp/', { otp_token: otpToken });
 }
 
-export async function invalidarRefreshToken(refresh: string) {
-  await apiClient.post('/auth/token/blacklist/', { refresh });
+export async function cerrarSesion() {
+  await apiClient.post('/auth/logout/');
 }
 
 export async function fetchMe() {
   const { data } = await apiClient.get<Me>('/auth/me/');
   return data;
+}
+
+export async function cambiarPassword(passwordActual: string, passwordNueva: string) {
+  await apiClient.post('/auth/cambiar-password/', {
+    password_actual: passwordActual,
+    password_nueva: passwordNueva,
+  });
 }
 
 export async function fetchUsuarios() {

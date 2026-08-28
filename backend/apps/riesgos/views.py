@@ -1,6 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 
+from apps.core.views import DescargaArchivoMixin
+
 from .models import ArchivoAdjuntoTratamiento, Amenaza, Riesgo, TratamientoRiesgo
 from .serializers import (
     AmenazaSerializer,
@@ -35,11 +37,11 @@ class TratamientoRiesgoViewSet(viewsets.ModelViewSet):
     ).all()
     serializer_class = TratamientoRiesgoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
-    filterset_fields = ['riesgo', 'opcion', 'estado', 'responsable']
+    filterset_fields = ['riesgo', 'opcion', 'responsable']
     ordering_fields = ['fecha_limite']
 
 
-class ArchivoAdjuntoTratamientoViewSet(viewsets.ModelViewSet):
+class ArchivoAdjuntoTratamientoViewSet(DescargaArchivoMixin, viewsets.ModelViewSet):
     queryset = ArchivoAdjuntoTratamiento.objects.select_related('tratamiento').all()
     serializer_class = ArchivoAdjuntoTratamientoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]

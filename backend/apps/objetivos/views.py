@@ -1,6 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 
+from apps.core.views import DescargaArchivoMixin
+
 from .models import ActividadObjetivo, ArchivoAdjuntoActividad, Objetivo
 from .serializers import ActividadObjetivoSerializer, ArchivoAdjuntoActividadSerializer, ObjetivoSerializer
 
@@ -21,7 +23,7 @@ class ActividadObjetivoViewSet(viewsets.ModelViewSet):
     filterset_fields = ['objetivo']
 
 
-class ArchivoAdjuntoActividadViewSet(viewsets.ModelViewSet):
+class ArchivoAdjuntoActividadViewSet(DescargaArchivoMixin, viewsets.ModelViewSet):
     queryset = ArchivoAdjuntoActividad.objects.select_related('actividad').all()
     serializer_class = ArchivoAdjuntoActividadSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]

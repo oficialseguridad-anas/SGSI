@@ -10,7 +10,7 @@ export interface Amenaza {
 }
 
 export type OpcionTratamiento = 'MITIGAR' | 'TRANSFERIR' | 'EVITAR' | 'ACEPTAR';
-export type EstadoTratamiento = 'PENDIENTE' | 'EN_PROGRESO' | 'COMPLETADO' | 'VENCIDO';
+export type EstadoTratamiento = 'PENDIENTE' | 'VENCIDO' | 'COMPLETADO';
 
 export interface ArchivoAdjuntoTratamiento {
   id: number;
@@ -53,7 +53,6 @@ export interface TratamientoRiesgoInput {
   evidencias_esperadas: string;
   probabilidad_residual: number | null;
   impacto_residual: number | null;
-  estado: EstadoTratamiento;
 }
 
 export interface Riesgo {

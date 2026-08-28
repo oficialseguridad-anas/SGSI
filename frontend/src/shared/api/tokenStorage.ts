@@ -1,18 +1,16 @@
-const ACCESS_KEY = 'sgsi_access_token';
-const REFRESH_KEY = 'sgsi_refresh_token';
+// El access token vive solo en memoria (variable de módulo), nunca en localStorage:
+// un script inyectado por XSS ya no puede robarlo leyendo el almacenamiento del
+// navegador. Se pierde al recargar la página a propósito — el arranque de la app pide
+// uno nuevo con el refresh token, que viaja en una cookie httpOnly separada que el
+// JavaScript del frontend nunca llega a ver (ISO/IEC 27001:2022 A.8.24).
+let accessToken: string | null = null;
 
 export const tokenStorage = {
-  getAccess: () => localStorage.getItem(ACCESS_KEY),
-  getRefresh: () => localStorage.getItem(REFRESH_KEY),
-  setTokens: (access: string, refresh: string) => {
-    localStorage.setItem(ACCESS_KEY, access);
-    localStorage.setItem(REFRESH_KEY, refresh);
-  },
+  getAccess: () => accessToken,
   setAccess: (access: string) => {
-    localStorage.setItem(ACCESS_KEY, access);
+    accessToken = access;
   },
   clear: () => {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
+    accessToken = null;
   },
 };

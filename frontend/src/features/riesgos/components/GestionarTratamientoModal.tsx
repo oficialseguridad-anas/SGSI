@@ -16,16 +16,14 @@ const NOMBRE_OPCION: Record<TratamientoRiesgo['opcion'], string> = {
 
 const COLOR_ESTADO: Record<TratamientoRiesgo['estado'], string> = {
   PENDIENTE: 'default',
-  EN_PROGRESO: 'blue',
-  COMPLETADO: 'green',
   VENCIDO: 'red',
+  COMPLETADO: 'green',
 };
 
 const NOMBRE_ESTADO: Record<TratamientoRiesgo['estado'], string> = {
   PENDIENTE: 'Pendiente',
-  EN_PROGRESO: 'En progreso',
-  COMPLETADO: 'Completado',
   VENCIDO: 'Vencido',
+  COMPLETADO: 'Completado',
 };
 
 interface Props {

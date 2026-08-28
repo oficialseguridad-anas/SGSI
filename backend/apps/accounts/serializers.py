@@ -1,3 +1,4 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
 from .models import Rol, Usuario, UsuarioRol
@@ -53,7 +54,8 @@ class MeSerializer(serializers.ModelSerializer):
         model = Usuario
         fields = [
             'id', 'email', 'nombre_completo', 'cargo', 'direccion_nombre',
-            'is_superuser', 'is_staff', 'otp_habilitado', 'otp_metodo', 'roles', 'permisos',
+            'is_superuser', 'is_staff', 'otp_habilitado', 'otp_metodo', 'debe_cambiar_password',
+            'roles', 'permisos',
         ]
 
     def get_roles(self, obj):
@@ -88,3 +90,18 @@ class ActivarEmailOtpSerializer(serializers.Serializer):
 
 class ReenviarCodigoOtpSerializer(serializers.Serializer):
     otp_token = serializers.CharField()
+
+
+class CambiarPasswordSerializer(serializers.Serializer):
+    password_actual = serializers.CharField()
+    password_nueva = serializers.CharField()
+
+    def validate_password_nueva(self, value):
+        validate_password(value, user=self.context['usuario'])
+        return value
+
+    def validate(self, attrs):
+        usuario = self.context['usuario']
+        if not usuario.check_password(attrs['password_actual']):
+            raise serializers.ValidationError({'password_actual': 'Contraseña actual incorrecta.'})
+        return attrs

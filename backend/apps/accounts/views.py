@@ -1,16 +1,23 @@
+from django.conf import settings
 from rest_framework import status, viewsets
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from rest_framework_simplejwt.settings import api_settings as jwt_settings
+from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from . import otp as otp_utils
 from .models import BitacoraAcceso, Rol, Usuario, UsuarioRol
-from .permissions import EsAdministrador
+from .permissions import EsAdministrador, PuedeVerUsuarios
 from .serializers import (
     Activar2FASerializer,
     ActivarEmailOtpSerializer,
+    CambiarPasswordSerializer,
     Desactivar2FASerializer,
     MeSerializer,
     ReenviarCodigoOtpSerializer,
@@ -33,10 +40,40 @@ def _registrar_acceso(request, usuario, email_intentado, tipo_evento):
     )
 
 
+def _set_refresh_cookie(response, refresh):
+    """Guarda el refresh token en una cookie httpOnly en vez de exponerlo en el cuerpo
+    JSON — así un script inyectado por XSS no puede leerlo desde localStorage (A.8.24)."""
+    response.set_cookie(
+        settings.REFRESH_TOKEN_COOKIE,
+        str(refresh),
+        max_age=int(jwt_settings.REFRESH_TOKEN_LIFETIME.total_seconds()),
+        path=settings.REFRESH_TOKEN_COOKIE_PATH,
+        httponly=True,
+        secure=settings.REFRESH_TOKEN_COOKIE_SECURE,
+        samesite=settings.REFRESH_TOKEN_COOKIE_SAMESITE,
+    )
+
+
+def _clear_refresh_cookie(response):
+    response.delete_cookie(
+        settings.REFRESH_TOKEN_COOKIE,
+        path=settings.REFRESH_TOKEN_COOKIE_PATH,
+        samesite=settings.REFRESH_TOKEN_COOKIE_SAMESITE,
+    )
+
+
 class SgsiTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
-        data = super().validate(attrs)
         request = self.context.get('request')
+        try:
+            data = super().validate(attrs)
+        except AuthenticationFailed:
+            # Credenciales incorrectas: se deja constancia igual que un fallo de OTP,
+            # para poder detectar fuerza bruta / credential stuffing (A.8.15/A.8.16).
+            _registrar_acceso(
+                request, None, attrs.get(self.username_field, ''), BitacoraAcceso.TipoEvento.LOGIN_FALLIDO
+            )
+            raise
 
         if self.user.otp_habilitado:
             if self.user.otp_metodo == Usuario.MetodoOtp.EMAIL:
@@ -53,10 +90,21 @@ class SgsiTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class SgsiTokenObtainPairView(TokenObtainPairView):
     serializer_class = SgsiTokenObtainPairSerializer
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        refresh = response.data.pop('refresh', None)
+        if refresh:
+            _set_refresh_cookie(response, refresh)
+        return response
 
 
 class VerificarOtpView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = VerificarOtpSerializer(data=request.data)
@@ -79,11 +127,15 @@ class VerificarOtpView(APIView):
 
         refresh = SgsiTokenObtainPairSerializer.get_token(usuario)
         _registrar_acceso(request, usuario, usuario.email, BitacoraAcceso.TipoEvento.LOGIN)
-        return Response({'access': str(refresh.access_token), 'refresh': str(refresh)})
+        response = Response({'access': str(refresh.access_token)})
+        _set_refresh_cookie(response, refresh)
+        return response
 
 
 class ReenviarCodigoOtpView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = ReenviarCodigoOtpSerializer(data=request.data)
@@ -110,11 +162,80 @@ class ReenviarCodigoOtpView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
+class SgsiTokenRefreshView(APIView):
+    """Como TokenRefreshView, pero lee el refresh token de la cookie httpOnly en vez
+    de pedirlo en el body — el frontend nunca tiene el valor para poder mandarlo."""
+
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'token_refresh'
+
+    def post(self, request):
+        token = request.COOKIES.get(settings.REFRESH_TOKEN_COOKIE)
+        if not token:
+            return Response({'detail': 'No hay sesión activa.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = TokenRefreshSerializer(data={'refresh': token})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError:
+            response = Response(
+                {'detail': 'La sesión expiró. Inicia sesión de nuevo.'}, status=status.HTTP_401_UNAUTHORIZED
+            )
+            _clear_refresh_cookie(response)
+            return response
+
+        data = dict(serializer.validated_data)
+        nuevo_refresh = data.pop('refresh', None)
+        response = Response(data)
+        if nuevo_refresh:
+            _set_refresh_cookie(response, nuevo_refresh)
+        return response
+
+
+class SgsiLogoutView(APIView):
+    """Invalida el refresh token (lista negra) y limpia la cookie. No exige estar
+    autenticado: si el access token ya expiró, igual debe poder cerrar la sesión."""
+
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        token = request.COOKIES.get(settings.REFRESH_TOKEN_COOKIE)
+        response = Response(status=status.HTTP_204_NO_CONTENT)
+        if token:
+            try:
+                RefreshToken(token).blacklist()
+            except TokenError:
+                pass
+        _clear_refresh_cookie(response)
+        return response
+
+
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         return Response(MeSerializer(request.user).data)
+
+
+class CambiarPasswordView(APIView):
+    """Cambio de contraseña por el propio usuario — usado tanto para el cambio
+    obligatorio en el primer inicio de sesión (debe_cambiar_password) como para un
+    cambio voluntario posterior."""
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
+
+    def post(self, request):
+        serializer = CambiarPasswordSerializer(data=request.data, context={'usuario': request.user})
+        serializer.is_valid(raise_exception=True)
+
+        usuario = request.user
+        usuario.set_password(serializer.validated_data['password_nueva'])
+        usuario.debe_cambiar_password = False
+        usuario.save(update_fields=['password', 'debe_cambiar_password'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class Setup2FAView(APIView):
@@ -140,6 +261,8 @@ class Setup2FAView(APIView):
 
 class Activar2FAView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = Activar2FASerializer(data=request.data)
@@ -163,6 +286,8 @@ class Activar2FAView(APIView):
 
 class EnviarCodigoEmailActivacionView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         if not otp_utils.puede_reenviar_codigo_email(request.user):
@@ -176,6 +301,8 @@ class EnviarCodigoEmailActivacionView(APIView):
 
 class ActivarEmailOtpView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = ActivarEmailOtpSerializer(data=request.data)
@@ -195,6 +322,8 @@ class ActivarEmailOtpView(APIView):
 
 class Desactivar2FAView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'auth'
 
     def post(self, request):
         serializer = Desactivar2FASerializer(data=request.data)
@@ -215,7 +344,7 @@ class Desactivar2FAView(APIView):
 
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all().order_by('email')
-    permission_classes = [EsAdministrador]
+    permission_classes = [PuedeVerUsuarios]
     filterset_fields = ['is_active', 'direccion']
     search_fields = ['email', 'nombre_completo', 'cargo', 'direccion__nombre']
     ordering_fields = ['email', 'date_joined']

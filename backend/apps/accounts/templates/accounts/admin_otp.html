@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Verificación en dos pasos - SGSI ISO 27001</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+      background: #f9f9f7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .caja {
+      background: #fff;
+      border: 1px solid #e1e0d9;
+      border-radius: 8px;
+      padding: 32px;
+      width: 100%;
+      max-width: 360px;
+      box-shadow: 0 2px 8px rgba(11,11,11,0.08);
+    }
+    h1 { font-size: 18px; margin: 0 0 4px; color: #0b0b0b; }
+    p.sub { color: #52514e; font-size: 13px; margin: 0 0 20px; }
+    label { display: block; font-size: 13px; color: #52514e; margin-bottom: 6px; }
+    input[type=text] {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 8px 10px;
+      border: 1px solid #c3c2b7;
+      border-radius: 4px;
+      font-size: 16px;
+      letter-spacing: 2px;
+    }
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 10px;
+      background: #0f5c4f;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    button:hover { background: #0c4a40; }
+    .error {
+      background: #fdecec;
+      color: #a13a3a;
+      border: 1px solid #f3c6c6;
+      border-radius: 4px;
+      padding: 8px 10px;
+      font-size: 13px;
+      margin-bottom: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="caja">
+    <h1>Verificación en dos pasos</h1>
+    <p class="sub">
+      {% if metodo == 'EMAIL' %}
+        Te enviamos un código a {{ usuario.email }}. También puedes usar un código de recuperación.
+      {% else %}
+        Ingresa el código de tu aplicación autenticadora, o un código de recuperación.
+      {% endif %}
+    </p>
+    {% if error %}<div class="error">{{ error }}</div>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      <label for="id_codigo">Código</label>
+      <input type="text" id="id_codigo" name="codigo" autocomplete="one-time-code" autofocus>
+      <button type="submit">Verificar</button>
+    </form>
+  </div>
+</body>
+</html>

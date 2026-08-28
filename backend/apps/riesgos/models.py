@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.activos.models import Activo
 from apps.core.models import TimeStampedModel
+from apps.core.validators import validar_extension_archivo, validar_tamano_archivo
 
 
 class NivelProbabilidad(models.IntegerChoices):
@@ -119,9 +121,8 @@ class TratamientoRiesgo(TimeStampedModel):
 
     class Estado(models.TextChoices):
         PENDIENTE = 'PENDIENTE', 'Pendiente'
-        EN_PROGRESO = 'EN_PROGRESO', 'En progreso'
-        COMPLETADO = 'COMPLETADO', 'Completado'
         VENCIDO = 'VENCIDO', 'Vencido'
+        COMPLETADO = 'COMPLETADO', 'Completado'
 
     riesgo = models.ForeignKey(Riesgo, on_delete=models.CASCADE, related_name='tratamientos', db_column='riesgoId')
     opcion = models.CharField(max_length=15, choices=Opcion.choices, verbose_name='Opción de tratamiento')
@@ -157,7 +158,6 @@ class TratamientoRiesgo(TimeStampedModel):
     riesgo_residual = models.PositiveSmallIntegerField(
         editable=False, null=True, blank=True, verbose_name='Riesgo residual', db_column='riesgoResidual'
     )
-    estado = models.CharField(max_length=15, choices=Estado.choices, default=Estado.PENDIENTE)
 
     class Meta:
         verbose_name = 'tratamiento de riesgo'
@@ -172,6 +172,17 @@ class TratamientoRiesgo(TimeStampedModel):
         if self.probabilidad_residual and self.impacto_residual:
             self.riesgo_residual = self.probabilidad_residual * self.impacto_residual
         super().save(*args, **kwargs)
+
+    @property
+    def estado(self):
+        """Se calcula solo: Completado si ya tiene alguna evidencia adjunta; si no,
+        Vencido cuando la fecha límite ya pasó, o Pendiente en cualquier otro caso
+        (mismo criterio que ActividadObjetivo.estado_ejecucion)."""
+        if self.archivos_adjuntos.exists():
+            return self.Estado.COMPLETADO
+        if self.fecha_limite and self.fecha_limite < timezone.localdate():
+            return self.Estado.VENCIDO
+        return self.Estado.PENDIENTE
 
     @property
     def nivel_de_riesgo_residual(self):
@@ -189,7 +200,10 @@ class ArchivoAdjuntoTratamiento(models.Model):
     tratamiento = models.ForeignKey(
         TratamientoRiesgo, on_delete=models.CASCADE, related_name='archivos_adjuntos', db_column='tratamientoId'
     )
-    archivo = models.FileField(upload_to='riesgos/tratamientos/%Y/%m/', verbose_name='Archivo')
+    archivo = models.FileField(
+        upload_to='riesgos/tratamientos/%Y/%m/', verbose_name='Archivo',
+        validators=[validar_extension_archivo, validar_tamano_archivo],
+    )
     subido_en = models.DateTimeField(auto_now_add=True, db_column='subidoEn')
 
     class Meta:

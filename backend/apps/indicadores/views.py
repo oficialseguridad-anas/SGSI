@@ -1,6 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 
+from apps.core.views import DescargaArchivoMixin
+
 from .models import Indicador, SeguimientoIndicador
 from .serializers import IndicadorSerializer, SeguimientoIndicadorSerializer
 
@@ -14,9 +16,10 @@ class IndicadorViewSet(viewsets.ModelViewSet):
     ordering_fields = ['codigo']
 
 
-class SeguimientoIndicadorViewSet(viewsets.ModelViewSet):
+class SeguimientoIndicadorViewSet(DescargaArchivoMixin, viewsets.ModelViewSet):
     queryset = SeguimientoIndicador.objects.select_related('indicador').all()
     serializer_class = SeguimientoIndicadorSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
     filterset_fields = ['indicador']
     ordering_fields = ['fecha_cargue']
+    campo_archivo = 'archivo_soporte'

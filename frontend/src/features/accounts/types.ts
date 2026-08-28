@@ -44,13 +44,15 @@ export interface Me {
   is_staff: boolean;
   otp_habilitado: boolean;
   otp_metodo: MetodoOtp;
+  debe_cambiar_password: boolean;
   roles: string[];
   permisos: string[];
 }
 
 export interface TokensJWT {
+  // El refresh token ya no viaja en el body: el backend lo entrega en una cookie
+  // httpOnly que el JavaScript del frontend nunca llega a leer.
   access: string;
-  refresh: string;
 }
 
 export interface LoginRequiereOtp {

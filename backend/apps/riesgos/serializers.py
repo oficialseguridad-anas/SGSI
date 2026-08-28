@@ -20,6 +20,7 @@ class TratamientoRiesgoSerializer(serializers.ModelSerializer):
     responsable_nombre = serializers.CharField(source='responsable.nombre_completo', read_only=True)
     archivos_adjuntos = ArchivoAdjuntoTratamientoSerializer(many=True, read_only=True)
     nivel_de_riesgo_residual = serializers.SerializerMethodField()
+    estado = serializers.ChoiceField(choices=TratamientoRiesgo.Estado.choices, read_only=True)
 
     class Meta:
         model = TratamientoRiesgo

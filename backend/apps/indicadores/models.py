@@ -4,6 +4,7 @@ from django.db import models
 from django.utils import timezone
 
 from apps.core.models import TimeStampedModel
+from apps.core.validators import validar_extension_archivo, validar_tamano_archivo
 
 
 class Indicador(TimeStampedModel):
@@ -160,6 +161,7 @@ class SeguimientoIndicador(TimeStampedModel):
     archivo_soporte = models.FileField(
         upload_to='indicadores/seguimientos/%Y/%m/', blank=True, verbose_name='Archivo soporte',
         db_column='archivoSoporte',
+        validators=[validar_extension_archivo, validar_tamano_archivo],
     )
 
     class Meta:

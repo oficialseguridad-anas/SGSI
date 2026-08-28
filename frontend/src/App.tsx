@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import { CambiarPasswordPage } from './features/accounts/pages/CambiarPasswordPage';
 import { LoginPage } from './features/accounts/pages/LoginPage';
 import { DashboardPage } from './features/accounts/pages/DashboardPage';
 import { SeguridadPage } from './features/accounts/pages/SeguridadPage';
@@ -18,6 +19,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route element={<PrivateRoute />}>
+        <Route path="/cambiar-password" element={<CambiarPasswordPage />} />
         <Route element={<Shell />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/activos" element={<ActivosPage />} />
