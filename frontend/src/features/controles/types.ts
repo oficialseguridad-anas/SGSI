@@ -9,6 +9,13 @@ export interface Control {
   descripcion: string;
 }
 
+export interface NumeralNorma {
+  id: number;
+  codigo: string;
+  nombre: string;
+  capitulo: string;
+}
+
 export interface AplicabilidadControl {
   id: number;
   control: number;

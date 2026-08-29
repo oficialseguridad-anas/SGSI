@@ -1,8 +1,8 @@
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 
-from .models import AplicabilidadControl, Control
-from .serializers import AplicabilidadControlSerializer, ControlSerializer
+from .models import AplicabilidadControl, Control, NumeralNorma
+from .serializers import AplicabilidadControlSerializer, ControlSerializer, NumeralNormaSerializer
 
 
 class ControlViewSet(viewsets.ReadOnlyModelViewSet):
@@ -12,6 +12,16 @@ class ControlViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = ControlSerializer
     permission_classes = [IsAuthenticated]
     filterset_fields = ['categoria']
+    search_fields = ['codigo', 'nombre']
+    ordering_fields = ['codigo']
+
+
+class NumeralNormaViewSet(viewsets.ReadOnlyModelViewSet):
+    """Catálogo de numerales del cuerpo principal de la norma: igual de solo lectura que Control."""
+
+    queryset = NumeralNorma.objects.all()
+    serializer_class = NumeralNormaSerializer
+    permission_classes = [IsAuthenticated]
     search_fields = ['codigo', 'nombre']
     ordering_fields = ['codigo']
 
