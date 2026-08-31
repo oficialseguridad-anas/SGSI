@@ -1,4 +1,4 @@
-import { AimOutlined, DatabaseOutlined, LineChartOutlined, WarningOutlined } from '@ant-design/icons';
+import { AimOutlined, AuditOutlined, DatabaseOutlined, LineChartOutlined, WarningOutlined } from '@ant-design/icons';
 import { Card, Col, Row, Space, Tag, Typography } from 'antd';
 import type { ReactNode } from 'react';
 import { useAuth } from '../../../app/AuthContext';
@@ -8,6 +8,9 @@ import { GraficaAvanceActividadesPorObjetivo } from '../../dashboard/components/
 import { GraficaCumplimientoIndicadores } from '../../dashboard/components/GraficaCumplimientoIndicadores';
 import { GraficaEstadoActividadesObjetivos } from '../../dashboard/components/GraficaEstadoActividadesObjetivos';
 import { GraficaEstadoSeguimientoIndicadores } from '../../dashboard/components/GraficaEstadoSeguimientoIndicadores';
+import { GraficaHallazgosEstado } from '../../dashboard/components/GraficaHallazgosEstado';
+import { GraficaHallazgosPorProceso } from '../../dashboard/components/GraficaHallazgosPorProceso';
+import { GraficaHallazgosTipo } from '../../dashboard/components/GraficaHallazgosTipo';
 import { GraficaObjetivosPorProceso } from '../../dashboard/components/GraficaObjetivosPorProceso';
 import { GraficaRiesgosEstado } from '../../dashboard/components/GraficaRiesgosEstado';
 import { GraficaRiesgosPorNivel } from '../../dashboard/components/GraficaRiesgosPorNivel';
@@ -81,6 +84,24 @@ export function DashboardPage() {
         <Col xs={24} lg={8}>
           <Card title="Estado del tratamiento" size="small" variant="borderless">
             <GraficaRiesgosTratamiento />
+          </Card>
+        </Col>
+      </SeccionModulo>
+
+      <SeccionModulo icono={<AuditOutlined />} titulo="Hallazgos de auditoría">
+        <Col xs={24} lg={8}>
+          <Card title="Hallazgos por estado" size="small" variant="borderless">
+            <GraficaHallazgosEstado />
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card title="Hallazgos por tipo" size="small" variant="borderless">
+            <GraficaHallazgosTipo />
+          </Card>
+        </Col>
+        <Col xs={24} lg={8}>
+          <Card title="Hallazgos por proceso" size="small" variant="borderless">
+            <GraficaHallazgosPorProceso />
           </Card>
         </Col>
       </SeccionModulo>

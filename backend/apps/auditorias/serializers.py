@@ -38,7 +38,9 @@ class HallazgoSerializer(serializers.ModelSerializer):
     tipos_nombres = serializers.SerializerMethodField()
     tipos_codigos = serializers.SerializerMethodField()
     controles_codigos = serializers.SerializerMethodField()
+    controles_nombres = serializers.SerializerMethodField()
     numerales_codigos = serializers.SerializerMethodField()
+    numerales_nombres = serializers.SerializerMethodField()
     seguimientos = SeguimientoHallazgoSerializer(many=True, read_only=True)
     estado = serializers.ChoiceField(choices=Hallazgo.Estado.choices, read_only=True)
 
@@ -46,8 +48,9 @@ class HallazgoSerializer(serializers.ModelSerializer):
         model = Hallazgo
         fields = [
             'id', 'codigo', 'fecha_deteccion', 'procesos', 'procesos_nombres', 'tipos', 'tipos_nombres',
-            'tipos_codigos', 'descripcion', 'evidencia_asociada', 'controles', 'controles_codigos', 'numerales',
-            'numerales_codigos', 'analisis_causa', 'estado', 'seguimientos', 'creado_en', 'actualizado_en',
+            'tipos_codigos', 'descripcion', 'evidencia_asociada', 'controles', 'controles_codigos',
+            'controles_nombres', 'numerales', 'numerales_codigos', 'numerales_nombres', 'analisis_causa', 'estado',
+            'seguimientos', 'creado_en', 'actualizado_en',
         ]
         read_only_fields = ['id', 'codigo', 'creado_en', 'actualizado_en']
 
@@ -63,8 +66,14 @@ class HallazgoSerializer(serializers.ModelSerializer):
     def get_controles_codigos(self, obj):
         return [c.codigo for c in obj.controles.all()]
 
+    def get_controles_nombres(self, obj):
+        return [c.nombre for c in obj.controles.all()]
+
     def get_numerales_codigos(self, obj):
         return [n.codigo for n in obj.numerales.all()]
+
+    def get_numerales_nombres(self, obj):
+        return [n.nombre for n in obj.numerales.all()]
 
     def validate_procesos(self, value):
         if not value:

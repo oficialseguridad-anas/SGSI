@@ -117,17 +117,21 @@ export function HallazgosPage() {
     {
       title: 'Requisito incumplido',
       key: 'requisito_incumplido',
-      width: 220,
+      width: 320,
       render: (_: unknown, hallazgo: Hallazgo) =>
         hallazgo.controles_codigos.length || hallazgo.numerales_codigos.length ? (
-          <Space size={[4, 4]} wrap>
-            {hallazgo.controles_codigos.map((c) => (
-              <Tag key={`c-${c}`}>{c}</Tag>
+          <Space direction="vertical" size={4} style={{ width: '100%' }}>
+            {hallazgo.controles_codigos.map((c, i) => (
+              <div key={`c-${c}`}>
+                <Tag>{c}</Tag>
+                <Typography.Text style={{ fontSize: 12 }}>{hallazgo.controles_nombres[i]}</Typography.Text>
+              </div>
             ))}
-            {hallazgo.numerales_codigos.map((n) => (
-              <Tag key={`n-${n}`} color="blue">
-                N.{n}
-              </Tag>
+            {hallazgo.numerales_codigos.map((n, i) => (
+              <div key={`n-${n}`}>
+                <Tag color="blue">N.{n}</Tag>
+                <Typography.Text style={{ fontSize: 12 }}>{hallazgo.numerales_nombres[i]}</Typography.Text>
+              </div>
             ))}
           </Space>
         ) : (
@@ -204,7 +208,7 @@ export function HallazgosPage() {
         columns={columns}
         dataSource={data?.results ?? []}
         pagination={false}
-        scroll={{ x: 1850 }}
+        scroll={{ x: 1950 }}
       />
       <HallazgoFormModal open={modalAbierto} hallazgo={hallazgoEditando} onClose={() => setModalAbierto(false)} />
       <GestionarSeguimientoModal

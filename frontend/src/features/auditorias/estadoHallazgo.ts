@@ -19,3 +19,10 @@ export const TEXTO_ESTADO_HALLAZGO: Record<EstadoHallazgo, string> = {
   EN_PROCESO: '#1a1a1a',
   CERRADA: '#ffffff',
 };
+
+// Mismos tonos claros que CLARO_ESTADO_TRATAMIENTO (riesgos) para los mismos colores base.
+export const CLARO_ESTADO_HALLAZGO: Record<EstadoHallazgo, string> = {
+  ABIERTA: '#f3a5a4',
+  EN_PROCESO: '#c3c2b7',
+  CERRADA: '#6fd66f',
+};
