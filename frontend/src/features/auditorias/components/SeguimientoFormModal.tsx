@@ -32,6 +32,22 @@ const COLOR_VERIFICACION: Record<SeguimientoHallazgo['verificacion_eficacia'], s
   NO_IMPLEMENTADO: 'default',
 };
 
+// Convierte la respuesta de error de DRF (que puede ser {detail}, {campo: [...]}, o un
+// string suelto) en un mensaje legible, en vez de mostrar siempre el mismo texto
+// genérico sin importar la causa real (permiso, extensión, tamaño, validación...).
+function extraerMensajeError(err: unknown): string | null {
+  const data = (err as { response?: { data?: unknown } }).response?.data;
+  if (!data) return null;
+  if (typeof data === 'string') return data;
+  if (typeof data === 'object') {
+    for (const valor of Object.values(data as Record<string, unknown>)) {
+      if (Array.isArray(valor) && typeof valor[0] === 'string') return valor[0];
+      if (typeof valor === 'string') return valor;
+    }
+  }
+  return null;
+}
+
 type FormValues = Omit<SeguimientoHallazgoInput, 'hallazgo' | 'fecha_compromiso' | 'fecha_seguimiento'> & {
   fecha_compromiso: dayjs.Dayjs | null;
   fecha_seguimiento: dayjs.Dayjs | null;
@@ -127,7 +143,10 @@ export function SeguimientoFormModal({ open, hallazgo, seguimiento, onClose }: P
       invalidar();
       onClose();
     },
-    onError: () => message.error('No se pudo guardar el seguimiento. Revisa los datos e intenta de nuevo.'),
+    onError: (err) =>
+      message.error(
+        extraerMensajeError(err) ?? 'No se pudo guardar el seguimiento. Revisa los datos e intenta de nuevo.',
+      ),
   });
 
   return (
