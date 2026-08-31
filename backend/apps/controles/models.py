@@ -27,6 +27,24 @@ class Control(models.Model):
         return f'{self.codigo} {self.nombre}'
 
 
+class NumeralNorma(models.Model):
+    """Catálogo de los numerales del cuerpo principal de ISO/IEC 27001:2022 (cláusulas 4 a
+    10 — el sistema de gestión en sí, distinto de los 93 controles del Anexo A)."""
+
+    codigo = models.CharField(max_length=10, unique=True)
+    nombre = models.CharField(max_length=200)
+    capitulo = models.CharField(max_length=100, blank=True, verbose_name='Capítulo')
+
+    class Meta:
+        verbose_name = 'numeral de la norma'
+        verbose_name_plural = 'numerales de la norma'
+        ordering = ['codigo']
+        db_table = 'numeralNorma'
+
+    def __str__(self):
+        return f'{self.codigo} {self.nombre}'
+
+
 class AplicabilidadControl(TimeStampedModel):
     """Declaración de Aplicabilidad (SoA): decisión operativa sobre cada control del catálogo."""
 

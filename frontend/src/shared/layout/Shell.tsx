@@ -1,5 +1,6 @@
 import {
   AimOutlined,
+  AuditOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
@@ -44,6 +45,13 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Controles (SoA)',
     icon: <SafetyCertificateOutlined />,
     perm: 'controles.view_aplicabilidadcontrol',
+  },
+  {
+    key: 'hallazgos',
+    path: '/hallazgos',
+    label: 'Hallazgos de auditoría',
+    icon: <AuditOutlined />,
+    perm: 'auditorias.view_hallazgo',
   },
   {
     key: 'documentos',

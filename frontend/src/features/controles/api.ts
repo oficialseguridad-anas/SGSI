@@ -1,5 +1,5 @@
 import { apiClient } from '../../shared/api/client';
-import type { AplicabilidadControl, AplicabilidadInput, Control } from './types';
+import type { AplicabilidadControl, AplicabilidadInput, Control, NumeralNorma } from './types';
 
 export async function fetchSoa() {
   const { data } = await apiClient.get<{ results: AplicabilidadControl[]; count: number }>('/soa/');
@@ -8,6 +8,11 @@ export async function fetchSoa() {
 
 export async function fetchControlesCatalogo() {
   const { data } = await apiClient.get<{ results: Control[]; count: number }>('/controles/');
+  return data;
+}
+
+export async function fetchNumeralesNorma() {
+  const { data } = await apiClient.get<{ results: NumeralNorma[]; count: number }>('/numerales-norma/');
   return data;
 }
 

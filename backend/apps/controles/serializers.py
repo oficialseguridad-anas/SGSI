@@ -1,12 +1,18 @@
 from rest_framework import serializers
 
-from .models import AplicabilidadControl, Control
+from .models import AplicabilidadControl, Control, NumeralNorma
 
 
 class ControlSerializer(serializers.ModelSerializer):
     class Meta:
         model = Control
         fields = ['id', 'codigo', 'nombre', 'categoria', 'descripcion']
+
+
+class NumeralNormaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = NumeralNorma
+        fields = ['id', 'codigo', 'nombre', 'capitulo']
 
 
 class AplicabilidadControlSerializer(serializers.ModelSerializer):

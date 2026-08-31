@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'apps.documentos',
     'apps.indicadores',
     'apps.objetivos',
+    'apps.auditorias',
 ]
 
 MIDDLEWARE = [

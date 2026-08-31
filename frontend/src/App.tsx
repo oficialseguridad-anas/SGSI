@@ -5,6 +5,7 @@ import { DashboardPage } from './features/accounts/pages/DashboardPage';
 import { SeguridadPage } from './features/accounts/pages/SeguridadPage';
 import { UsuariosPage } from './features/accounts/pages/UsuariosPage';
 import { ActivosPage } from './features/activos/pages/ActivosPage';
+import { HallazgosPage } from './features/auditorias/pages/HallazgosPage';
 import { ControlesPage } from './features/controles/pages/ControlesPage';
 import { DocumentosPage } from './features/documentos/pages/DocumentosPage';
 import { IndicadoresPage } from './features/indicadores/pages/IndicadoresPage';
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/activos" element={<ActivosPage />} />
           <Route path="/riesgos" element={<RiesgosPage />} />
           <Route path="/controles" element={<ControlesPage />} />
+          <Route path="/hallazgos" element={<HallazgosPage />} />
           <Route path="/documentos" element={<DocumentosPage />} />
           <Route path="/indicadores" element={<IndicadoresPage />} />
           <Route path="/objetivos" element={<ObjetivosPage />} />
