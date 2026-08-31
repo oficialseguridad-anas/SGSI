@@ -163,9 +163,19 @@ export function HallazgosPage() {
       key: 'estado',
       width: 110,
       render: (estado: Hallazgo['estado']) => (
-        <Tag color={COLOR_ESTADO_HALLAZGO[estado]} style={{ color: TEXTO_ESTADO_HALLAZGO[estado], borderColor: 'transparent' }}>
+        <div
+          style={{
+            background: COLOR_ESTADO_HALLAZGO[estado],
+            color: TEXTO_ESTADO_HALLAZGO[estado],
+            borderRadius: 4,
+            padding: '4px 10px',
+            textAlign: 'center',
+            fontWeight: 600,
+            fontSize: 12,
+          }}
+        >
           {NOMBRE_ESTADO_HALLAZGO[estado]}
-        </Tag>
+        </div>
       ),
     },
     {

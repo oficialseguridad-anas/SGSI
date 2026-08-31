@@ -14,73 +14,60 @@ export function GraficaHallazgosTipo() {
   const { data, isLoading } = useQuery({ queryKey: ['hallazgos'], queryFn: fetchHallazgos });
   const [vistaTabla, setVistaTabla] = useState(false);
 
-  const conteos = useMemo(() => {
+  const { conteos, totalHallazgos } = useMemo(() => {
     const base = { NC: 0, AM: 0 };
-    for (const hallazgo of data?.results ?? []) {
+    const hallazgos = data?.results ?? [];
+    for (const hallazgo of hallazgos) {
       for (const codigo of hallazgo.tipos_codigos) {
         if (codigo === 'NC' || codigo === 'AM') base[codigo] += 1;
       }
     }
-    return base;
+    return { conteos: base, totalHallazgos: hallazgos.length };
   }, [data]);
-
-  const total = conteos.NC + conteos.AM;
 
   const opcionGrafica = useMemo(
     () => ({
       animationDuration: 900,
       animationEasing: 'elasticOut' as const,
+      grid: { left: 16, right: 36, top: 8, bottom: 8, containLabel: true },
       tooltip: {
-        trigger: 'item' as const,
+        trigger: 'axis' as const,
+        axisPointer: { type: 'shadow' as const },
         backgroundColor: 'rgba(17,17,17,0.92)',
         borderWidth: 0,
         padding: [8, 12],
         textStyle: { color: '#fff', fontSize: 13 },
-        formatter: (p: { name: string; value: number; percent: number }) =>
-          `<strong>${p.value}</strong> hallazgos · ${p.name} (${p.percent}%)`,
-      },
-      legend: {
-        bottom: 2,
-        icon: 'circle' as const,
-        itemWidth: 10,
-        itemHeight: 10,
-        itemGap: 18,
-        textStyle: { color: '#52514e', fontSize: 12 },
-        formatter: (name: string) => {
-          const clave = ORDEN.find((k) => ESTILO[k].etiqueta === name);
-          return clave ? `${name}  ${conteos[clave]}` : name;
+        formatter: (params: Array<{ name: string; value: number }>) => {
+          const p = params[0];
+          const porcentaje = totalHallazgos ? Math.round((p.value / totalHallazgos) * 100) : 0;
+          return `<strong>${p.value}</strong> hallazgos · ${p.name} (${porcentaje}% de los ${totalHallazgos})`;
         },
+      },
+      xAxis: { type: 'value' as const, show: false },
+      yAxis: {
+        type: 'category' as const,
+        data: ORDEN.map((clave) => ESTILO[clave].etiqueta),
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: { color: '#52514e', fontSize: 12, fontWeight: 500 },
       },
       series: [
         {
           name: 'Hallazgos por tipo',
-          type: 'pie' as const,
-          radius: ['56%', '80%'],
-          center: ['50%', '44%'],
-          avoidLabelOverlap: true,
-          label: { show: false },
-          labelLine: { show: false },
-          itemStyle: {
-            borderRadius: 10,
-            borderColor: '#fff',
-            borderWidth: 3,
-            shadowBlur: 14,
-            shadowColor: 'rgba(11,11,11,0.16)',
-          },
-          emphasis: {
-            scale: true,
-            scaleSize: 6,
-            itemStyle: { shadowBlur: 22, shadowColor: 'rgba(11,11,11,0.32)' },
-          },
+          type: 'bar' as const,
+          barWidth: '55%',
+          label: { show: true, position: 'right' as const, fontWeight: 700, fontSize: 13, color: '#0b0b0b' },
+          itemStyle: { borderRadius: [0, 8, 8, 0], shadowBlur: 10, shadowColor: 'rgba(11,11,11,0.14)' },
+          emphasis: { itemStyle: { shadowBlur: 18, shadowColor: 'rgba(11,11,11,0.30)' } },
           data: ORDEN.map((clave) => ({
-            name: ESTILO[clave].etiqueta,
             value: conteos[clave],
             itemStyle: {
               color: {
-                type: 'radial' as const,
-                x: 0.5,
-                y: 0.5,
-                r: 0.9,
+                type: 'linear' as const,
+                x: 0,
+                y: 0,
+                x2: 1,
+                y2: 0,
                 colorStops: [
                   { offset: 0, color: ESTILO[clave].claro },
                   { offset: 1, color: ESTILO[clave].color },
@@ -93,26 +80,20 @@ export function GraficaHallazgosTipo() {
       graphic: [
         {
           type: 'text' as const,
-          left: 'center' as const,
-          top: '36%',
-          style: { text: String(total), fontSize: 34, fontWeight: 700, fill: '#0b0b0b' },
-        },
-        {
-          type: 'text' as const,
-          left: 'center' as const,
-          top: '46%',
-          style: { text: 'vínculos', fontSize: 13, fill: '#898781' },
+          right: 8,
+          top: 0,
+          style: { text: `de ${totalHallazgos} hallazgos`, fontSize: 12, fill: '#898781' },
         },
       ],
     }),
-    [conteos, total],
+    [conteos, totalHallazgos],
   );
 
   if (isLoading) {
     return <Skeleton active paragraph={{ rows: 4 }} />;
   }
 
-  if (total === 0) {
+  if (totalHallazgos === 0) {
     return <Empty description="Todavía no hay hallazgos registrados" />;
   }
 
@@ -130,7 +111,7 @@ export function GraficaHallazgosTipo() {
             <tr style={{ textAlign: 'left', color: '#52514e', borderBottom: '1px solid #e1e0d9' }}>
               <th style={{ padding: '6px 8px', fontWeight: 500 }}>Tipo</th>
               <th style={{ padding: '6px 8px', fontWeight: 500 }}>Hallazgos</th>
-              <th style={{ padding: '6px 8px', fontWeight: 500 }}>Porcentaje</th>
+              <th style={{ padding: '6px 8px', fontWeight: 500 }}>% de los {totalHallazgos}</th>
             </tr>
           </thead>
           <tbody>
@@ -151,7 +132,7 @@ export function GraficaHallazgosTipo() {
                 </td>
                 <td style={{ padding: '6px 8px', fontVariantNumeric: 'tabular-nums' }}>{conteos[clave]}</td>
                 <td style={{ padding: '6px 8px', fontVariantNumeric: 'tabular-nums' }}>
-                  {total ? Math.round((conteos[clave] / total) * 100) : 0}%
+                  {totalHallazgos ? Math.round((conteos[clave] / totalHallazgos) * 100) : 0}%
                 </td>
               </tr>
             ))}
@@ -161,7 +142,7 @@ export function GraficaHallazgosTipo() {
         <ReactECharts
           option={opcionGrafica}
           style={{ height: 260, width: '100%' }}
-          aria-label={`Hallazgos por tipo: ${ORDEN.map((k) => `${ESTILO[k].etiqueta} ${conteos[k]}`).join(', ')}`}
+          aria-label={`Hallazgos por tipo, de ${totalHallazgos} hallazgos: ${ORDEN.map((k) => `${ESTILO[k].etiqueta} ${conteos[k]}`).join(', ')}`}
         />
       )}
     </div>
