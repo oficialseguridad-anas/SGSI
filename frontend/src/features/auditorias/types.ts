@@ -52,8 +52,10 @@ export interface Hallazgo {
   evidencia_asociada: string;
   controles: number[];
   controles_codigos: string[];
+  controles_nombres: string[];
   numerales: number[];
   numerales_codigos: string[];
+  numerales_nombres: string[];
   analisis_causa: string;
   estado: EstadoHallazgo;
   seguimientos: SeguimientoHallazgo[];
