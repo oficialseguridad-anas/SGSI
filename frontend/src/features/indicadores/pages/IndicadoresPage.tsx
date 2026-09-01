@@ -1,9 +1,10 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { GestionarSeguimientoModal } from '../components/GestionarSeguimientoModal';
 import { IndicadorFormModal } from '../components/IndicadorFormModal';
 import { eliminarIndicador, fetchIndicadores } from '../api';
@@ -39,6 +40,25 @@ export function IndicadoresPage() {
   const [indicadorEditando, setIndicadorEditando] = useState<Indicador | null>(null);
   const [seguimientoModalAbierto, setSeguimientoModalAbierto] = useState(false);
   const [indicadorParaSeguimiento, setIndicadorParaSeguimiento] = useState<Indicador | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+
+  const indicadores = data?.results ?? [];
+  const indicadoresFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return indicadores;
+    return indicadores.filter((i) => {
+      const campos = [
+        i.codigo,
+        i.nombre,
+        NOMBRE_TIPO[i.tipo],
+        i.meta,
+        i.formula,
+        i.responsable_medicion,
+        i.objetivo,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [indicadores, busqueda]);
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarIndicador,
@@ -218,13 +238,31 @@ export function IndicadoresPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los indicadores" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por ID, nombre, tipo, meta, fórmula, responsable u objetivo..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 480 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {indicadoresFiltrados.length} de {indicadores.length} indicadores
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
-        dataSource={data?.results ?? []}
+        dataSource={indicadoresFiltrados}
         pagination={false}
         scroll={{ x: 1600 }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún indicador coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <IndicadorFormModal open={modalAbierto} indicador={indicadorEditando} onClose={() => setModalAbierto(false)} />
       <GestionarSeguimientoModal

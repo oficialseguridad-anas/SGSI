@@ -1,10 +1,11 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { eliminarSeguimiento, fetchSeguimientos } from '../api';
 import type { Hallazgo, SeguimientoHallazgo } from '../types';
+import { PrevisualizarEvidenciasModal } from './PrevisualizarEvidenciasModal';
 import { SeguimientoFormModal } from './SeguimientoFormModal';
 
 const COLOR_VERIFICACION: Record<SeguimientoHallazgo['verificacion_eficacia'], string> = {
@@ -32,6 +33,8 @@ export function GestionarSeguimientoModal({ open, hallazgo, onClose }: Props) {
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
   const [seguimientoEditando, setSeguimientoEditando] = useState<SeguimientoHallazgo | null>(null);
+  const [previsualizarAbierto, setPrevisualizarAbierto] = useState(false);
+  const [seguimientoParaPrevisualizar, setSeguimientoParaPrevisualizar] = useState<SeguimientoHallazgo | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['seguimientos', hallazgo?.id],
@@ -57,6 +60,11 @@ export function GestionarSeguimientoModal({ open, hallazgo, onClose }: Props) {
   function abrirEditar(seguimiento: SeguimientoHallazgo) {
     setSeguimientoEditando(seguimiento);
     setFormAbierto(true);
+  }
+
+  function abrirPrevisualizacion(seguimiento: SeguimientoHallazgo) {
+    setSeguimientoParaPrevisualizar(seguimiento);
+    setPrevisualizarAbierto(true);
   }
 
   const columns = [
@@ -119,7 +127,19 @@ export function GestionarSeguimientoModal({ open, hallazgo, onClose }: Props) {
       title: 'Evidencias',
       key: 'evidencias',
       width: 100,
-      render: (_: unknown, seguimiento: SeguimientoHallazgo) => seguimiento.archivos_adjuntos.length,
+      render: (_: unknown, seguimiento: SeguimientoHallazgo) =>
+        seguimiento.archivos_adjuntos.length > 0 ? (
+          <Button
+            size="small"
+            type="text"
+            icon={<PaperClipOutlined />}
+            onClick={() => abrirPrevisualizacion(seguimiento)}
+          >
+            {seguimiento.archivos_adjuntos.length}
+          </Button>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Acciones',
@@ -177,6 +197,16 @@ export function GestionarSeguimientoModal({ open, hallazgo, onClose }: Props) {
         hallazgo={hallazgo}
         seguimiento={seguimientoEditando}
         onClose={() => setFormAbierto(false)}
+      />
+      <PrevisualizarEvidenciasModal
+        open={previsualizarAbierto}
+        titulo={
+          hallazgo && seguimientoParaPrevisualizar
+            ? `Evidencias — ${hallazgo.codigo} · seguimiento del ${seguimientoParaPrevisualizar.fecha_seguimiento ?? 'sin fecha'}`
+            : 'Evidencias'
+        }
+        archivos={seguimientoParaPrevisualizar?.archivos_adjuntos ?? []}
+        onClose={() => setPrevisualizarAbierto(false)}
       />
     </>
   );

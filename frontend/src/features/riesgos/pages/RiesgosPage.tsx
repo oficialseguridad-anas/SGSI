@@ -1,9 +1,10 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { GestionarTratamientoModal } from '../components/GestionarTratamientoModal';
 import { MapaCalorRiesgosModal } from '../components/MapaCalorRiesgosModal';
 import { PrevisualizarEvidenciasModal } from '../components/PrevisualizarEvidenciasModal';
@@ -37,6 +38,23 @@ export function RiesgosPage() {
   const [tratamientoParaPrevisualizar, setTratamientoParaPrevisualizar] = useState<Riesgo['tratamientos'][number] | null>(
     null,
   );
+  const [busqueda, setBusqueda] = useState('');
+
+  const riesgos = data?.results ?? [];
+  const riesgosFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return riesgos;
+    return riesgos.filter((riesgo) => {
+      const campos = [
+        riesgo.codigo,
+        riesgo.amenaza_nombre,
+        NOMBRE_NIVEL_RIESGO[riesgo.nivel_de_riesgo],
+        ...riesgo.activos_nombres,
+        ...riesgo.propietarios_nombres,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [riesgos, busqueda]);
 
   function abrirPrevisualizacion(tratamiento: Riesgo['tratamientos'][number]) {
     setTratamientoParaPrevisualizar(tratamiento);
@@ -215,13 +233,31 @@ export function RiesgosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los riesgos" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por código, activo, amenaza, nivel de riesgo o propietario..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 480 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {riesgosFiltrados.length} de {riesgos.length} riesgos
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
-        dataSource={data?.results ?? []}
+        dataSource={riesgosFiltrados}
         pagination={false}
         scroll={{ x: 1550 }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún riesgo coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <RiesgoFormModal open={modalAbierto} riesgo={riesgoEditando} onClose={() => setModalAbierto(false)} />
       <MapaCalorRiesgosModal open={mapaCalorAbierto} onClose={() => setMapaCalorAbierto(false)} />

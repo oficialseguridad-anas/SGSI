@@ -13,6 +13,10 @@ class Documento(TimeStampedModel):
         FORMATO = 'FORMATO', 'Formato'
         REGISTRO = 'REGISTRO', 'Registro'
         INSTRUCTIVO = 'INSTRUCTIVO', 'Instructivo'
+        PLAN = 'PLAN', 'Plan'
+        MATRIZ = 'MATRIZ', 'Matriz'
+        GUIA = 'GUIA', 'Guía'
+        PROGRAMA = 'PROGRAMA', 'Programa'
 
     class Estado(models.TextChoices):
         BORRADOR = 'BORRADOR', 'Borrador'

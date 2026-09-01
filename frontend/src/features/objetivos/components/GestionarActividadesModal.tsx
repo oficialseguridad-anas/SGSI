@@ -1,4 +1,4 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
@@ -6,6 +6,7 @@ import { useAuth } from '../../../app/AuthContext';
 import { eliminarActividad, fetchActividades } from '../api';
 import type { ActividadObjetivo, Objetivo } from '../types';
 import { ActividadFormModal } from './ActividadFormModal';
+import { PrevisualizarSoportesModal } from './PrevisualizarSoportesModal';
 
 const COLOR_ESTADO: Record<ActividadObjetivo['estado_ejecucion'], string> = {
   PENDIENTE: 'default',
@@ -38,6 +39,8 @@ export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
   const [actividadEditando, setActividadEditando] = useState<ActividadObjetivo | null>(null);
+  const [previsualizarAbierto, setPrevisualizarAbierto] = useState(false);
+  const [actividadParaPrevisualizar, setActividadParaPrevisualizar] = useState<ActividadObjetivo | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['actividades', objetivo?.id],
@@ -63,6 +66,11 @@ export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
   function abrirEditar(actividad: ActividadObjetivo) {
     setActividadEditando(actividad);
     setFormAbierto(true);
+  }
+
+  function abrirPrevisualizacion(actividad: ActividadObjetivo) {
+    setActividadParaPrevisualizar(actividad);
+    setPrevisualizarAbierto(true);
   }
 
   function textoCompacto(texto: string, ancho = 220) {
@@ -117,7 +125,19 @@ export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
       title: 'Soportes',
       key: 'soportes',
       width: 90,
-      render: (_: unknown, actividad: ActividadObjetivo) => actividad.archivos_adjuntos.length || '—',
+      render: (_: unknown, actividad: ActividadObjetivo) =>
+        actividad.archivos_adjuntos.length > 0 ? (
+          <Button
+            size="small"
+            type="text"
+            icon={<PaperClipOutlined />}
+            onClick={() => abrirPrevisualizacion(actividad)}
+          >
+            {actividad.archivos_adjuntos.length}
+          </Button>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Acciones',
@@ -175,6 +195,16 @@ export function GestionarActividadesModal({ open, objetivo, onClose }: Props) {
         objetivo={objetivo}
         actividad={actividadEditando}
         onClose={() => setFormAbierto(false)}
+      />
+      <PrevisualizarSoportesModal
+        open={previsualizarAbierto}
+        titulo={
+          actividadParaPrevisualizar
+            ? `Soportes — ${actividadParaPrevisualizar.actividad}`
+            : 'Soportes'
+        }
+        archivos={actividadParaPrevisualizar?.archivos_adjuntos ?? []}
+        onClose={() => setPrevisualizarAbierto(false)}
       />
     </>
   );

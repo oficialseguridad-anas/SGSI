@@ -1,12 +1,12 @@
 import { PaperClipOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Modal, Popconfirm, Space, Table, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
-import { descargarArchivo, nombreDeArchivo } from '../../../shared/api/descargarArchivo';
 import { eliminarSeguimiento, fetchSeguimientos } from '../api';
 import { COLOR_CUMPLIMIENTO, NOMBRE_CUMPLIMIENTO } from '../formula';
 import type { Indicador, SeguimientoIndicador } from '../types';
+import { PrevisualizarSoporteModal } from './PrevisualizarSoporteModal';
 import { SeguimientoFormModal } from './SeguimientoFormModal';
 
 interface Props {
@@ -20,6 +20,8 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
   const [seguimientoEditando, setSeguimientoEditando] = useState<SeguimientoIndicador | null>(null);
+  const [previsualizarAbierto, setPrevisualizarAbierto] = useState(false);
+  const [seguimientoParaPrevisualizar, setSeguimientoParaPrevisualizar] = useState<SeguimientoIndicador | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['seguimientos-indicador', indicador?.id],
@@ -45,6 +47,11 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
   function abrirEditar(seguimiento: SeguimientoIndicador) {
     setSeguimientoEditando(seguimiento);
     setFormAbierto(true);
+  }
+
+  function abrirPrevisualizacion(seguimiento: SeguimientoIndicador) {
+    setSeguimientoParaPrevisualizar(seguimiento);
+    setPrevisualizarAbierto(true);
   }
 
   const columns = [
@@ -84,16 +91,9 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
       key: 'archivo_soporte',
       render: (archivo: string | null, seguimiento: SeguimientoIndicador) =>
         archivo ? (
-          <Typography.Link
-            onClick={() =>
-              descargarArchivo(
-                `/seguimientos-indicador/${seguimiento.id}/descargar/`,
-                nombreDeArchivo(archivo),
-              )
-            }
-          >
-            <PaperClipOutlined /> Ver archivo
-          </Typography.Link>
+          <Button size="small" type="text" icon={<PaperClipOutlined />} onClick={() => abrirPrevisualizacion(seguimiento)}>
+            Ver archivo
+          </Button>
         ) : (
           '—'
         ),
@@ -152,6 +152,15 @@ export function GestionarSeguimientoModal({ open, indicador, onClose }: Props) {
         indicador={indicador}
         seguimiento={seguimientoEditando}
         onClose={() => setFormAbierto(false)}
+      />
+      <PrevisualizarSoporteModal
+        open={previsualizarAbierto}
+        titulo={
+          seguimientoParaPrevisualizar ? `Archivo soporte — periodo ${seguimientoParaPrevisualizar.periodo}` : 'Archivo soporte'
+        }
+        seguimientoId={seguimientoParaPrevisualizar?.id ?? null}
+        archivo={seguimientoParaPrevisualizar?.archivo_soporte ?? null}
+        onClose={() => setPrevisualizarAbierto(false)}
       />
     </>
   );

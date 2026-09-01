@@ -1,11 +1,12 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Select, Space, Table, Tag, message } from 'antd';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { ActivoFormModal } from '../components/ActivoFormModal';
-import { eliminarActivo, fetchActivos, fetchProcesos } from '../api';
+import { eliminarActivo, fetchActivos } from '../api';
 import type { Activo, ClaseActivo, EstadoActivo, EtiquetadoActivo, NivelValoracion, TipoActivo } from '../types';
 
 const NOMBRE_CLASE: Record<ClaseActivo, string> = {
@@ -44,29 +45,41 @@ const NOMBRE_CRITICIDAD: Record<NivelValoracion, string> = {
 
 const CELDA_AJUSTABLE: CSSProperties = { whiteSpace: 'normal', wordBreak: 'break-word' };
 
-const OPCIONES_CRITICIDAD = [
-  { value: 'ALTA', label: 'Alta' },
-  { value: 'MEDIA', label: 'Media' },
-  { value: 'BAJA', label: 'Baja' },
-];
+const NOMBRE_TIPO_ACTIVO: Record<TipoActivo, string> = {
+  PRIMARIO: 'Primario',
+  SECUNDARIO: 'Secundario',
+};
 
 export function ActivosPage() {
   const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
-  const { data: procesos } = useQuery({ queryKey: ['procesos'], queryFn: fetchProcesos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [activoEditando, setActivoEditando] = useState<Activo | null>(null);
-  const [filtroProceso, setFiltroProceso] = useState<string | undefined>(undefined);
-  const [filtroCriticidad, setFiltroCriticidad] = useState<NivelValoracion | undefined>(undefined);
+  const [busqueda, setBusqueda] = useState('');
 
+  // Filtro instantáneo en el cliente — mismo criterio que en Documentos: el listado
+  // completo ya viaja en un solo request, así que filtrar localmente responde al
+  // instante en cada tecla, sin ida y vuelta al servidor.
+  const activos = data?.results ?? [];
   const activosFiltrados = useMemo(() => {
-    return (data?.results ?? []).filter((activo) => {
-      if (filtroProceso && activo.proceso_nombre !== filtroProceso) return false;
-      if (filtroCriticidad && activo.criticidad !== filtroCriticidad) return false;
-      return true;
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return activos;
+    return activos.filter((activo) => {
+      const campos = [
+        activo.codigo,
+        activo.nombre,
+        activo.proceso_nombre,
+        NOMBRE_TIPO_ACTIVO[activo.tipo_activo],
+        NOMBRE_CLASE[activo.clase_activo],
+        activo.etiquetado,
+        activo.propietario,
+        NOMBRE_CRITICIDAD[activo.criticidad],
+        activo.estado,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
     });
-  }, [data, filtroProceso, filtroCriticidad]);
+  }, [activos, busqueda]);
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarActivo,
@@ -186,26 +199,21 @@ export function ActivosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los activos" />
-      <Space style={{ marginBottom: 16 }} wrap>
-        <Select
-          placeholder="Buscar por proceso"
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
           allowClear
-          showSearch
-          optionFilterProp="label"
-          style={{ width: 260 }}
-          value={filtroProceso}
-          onChange={setFiltroProceso}
-          options={procesos?.results.map((p) => ({ value: p.nombre, label: p.nombre }))}
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por código, nombre, proceso, tipo, clase, propietario, criticidad o estado..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 480 }}
         />
-        <Select
-          placeholder="Buscar por criticidad"
-          allowClear
-          style={{ width: 200 }}
-          value={filtroCriticidad}
-          onChange={setFiltroCriticidad}
-          options={OPCIONES_CRITICIDAD}
-        />
-      </Space>
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {activosFiltrados.length} de {activos.length} activos
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
@@ -213,6 +221,9 @@ export function ActivosPage() {
         dataSource={activosFiltrados}
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `${total} activos` }}
         scroll={{ x: 1450 }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún activo coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <ActivoFormModal open={modalAbierto} activo={activoEditando} onClose={() => setModalAbierto(false)} />
     </Card>

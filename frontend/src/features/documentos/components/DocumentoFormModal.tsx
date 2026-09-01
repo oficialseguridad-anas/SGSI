@@ -14,6 +14,10 @@ const OPCIONES_TIPO = [
   { value: 'FORMATO', label: 'Formato' },
   { value: 'REGISTRO', label: 'Registro' },
   { value: 'INSTRUCTIVO', label: 'Instructivo' },
+  { value: 'PLAN', label: 'Plan' },
+  { value: 'MATRIZ', label: 'Matriz' },
+  { value: 'GUIA', label: 'Guía' },
+  { value: 'PROGRAMA', label: 'Programa' },
 ];
 
 const OPCIONES_ESTADO = [

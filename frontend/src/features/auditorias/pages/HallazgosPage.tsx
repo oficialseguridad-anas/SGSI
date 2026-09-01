@@ -1,9 +1,10 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { GestionarSeguimientoModal } from '../components/GestionarSeguimientoModal';
 import { HallazgoFormModal } from '../components/HallazgoFormModal';
 import { eliminarHallazgo, fetchHallazgos } from '../api';
@@ -34,6 +35,29 @@ export function HallazgosPage() {
   const [hallazgoEditando, setHallazgoEditando] = useState<Hallazgo | null>(null);
   const [seguimientoModalAbierto, setSeguimientoModalAbierto] = useState(false);
   const [hallazgoParaSeguimiento, setHallazgoParaSeguimiento] = useState<Hallazgo | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+
+  const hallazgos = data?.results ?? [];
+  const hallazgosFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return hallazgos;
+    return hallazgos.filter((h) => {
+      const campos = [
+        h.codigo,
+        h.descripcion,
+        h.evidencia_asociada,
+        h.analisis_causa,
+        NOMBRE_ESTADO_HALLAZGO[h.estado],
+        ...h.procesos_nombres,
+        ...h.tipos_nombres,
+        ...h.controles_codigos,
+        ...h.controles_nombres,
+        ...h.numerales_codigos,
+        ...h.numerales_nombres,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [hallazgos, busqueda]);
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarHallazgo,
@@ -212,13 +236,31 @@ export function HallazgosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los hallazgos" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por código, proceso, tipo, descripción, requisito o estado..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 480 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {hallazgosFiltrados.length} de {hallazgos.length} hallazgos
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
-        dataSource={data?.results ?? []}
+        dataSource={hallazgosFiltrados}
         pagination={false}
         scroll={{ x: 1950 }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún hallazgo coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <HallazgoFormModal open={modalAbierto} hallazgo={hallazgoEditando} onClose={() => setModalAbierto(false)} />
       <GestionarSeguimientoModal

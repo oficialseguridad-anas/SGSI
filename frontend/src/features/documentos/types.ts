@@ -1,4 +1,14 @@
-export type TipoDocumento = 'POLITICA' | 'PROCEDIMIENTO' | 'MANUAL' | 'FORMATO' | 'REGISTRO' | 'INSTRUCTIVO';
+export type TipoDocumento =
+  | 'POLITICA'
+  | 'PROCEDIMIENTO'
+  | 'MANUAL'
+  | 'FORMATO'
+  | 'REGISTRO'
+  | 'INSTRUCTIVO'
+  | 'PLAN'
+  | 'MATRIZ'
+  | 'GUIA'
+  | 'PROGRAMA';
 export type EstadoDocumento = 'BORRADOR' | 'EN_REVISION' | 'APROBADO' | 'VIGENTE' | 'OBSOLETO';
 
 export interface VersionDocumento {

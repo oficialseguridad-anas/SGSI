@@ -1,9 +1,10 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { GestionarActividadesModal } from '../components/GestionarActividadesModal';
 import { ObjetivoFormModal } from '../components/ObjetivoFormModal';
 import { eliminarObjetivo, fetchObjetivos } from '../api';
@@ -17,6 +18,25 @@ export function ObjetivosPage() {
   const [objetivoEditando, setObjetivoEditando] = useState<Objetivo | null>(null);
   const [actividadesModalAbierto, setActividadesModalAbierto] = useState(false);
   const [objetivoParaActividades, setObjetivoParaActividades] = useState<Objetivo | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+
+  const objetivos = data?.results ?? [];
+  const objetivosFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return objetivos;
+    return objetivos.filter((o) => {
+      const campos = [
+        o.objetivo,
+        o.componente_politica,
+        o.responsables_seguimiento,
+        o.indicador_desempeno,
+        o.meta_indicador,
+        ...o.procesos_nombres,
+        ...o.indicadores_codigos,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [objetivos, busqueda]);
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarObjetivo,
@@ -178,13 +198,31 @@ export function ObjetivosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los objetivos" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por objetivo, componente, proceso, responsable o indicador..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 480 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {objetivosFiltrados.length} de {objetivos.length} objetivos
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
-        dataSource={data?.results ?? []}
+        dataSource={objetivosFiltrados}
         pagination={false}
         scroll={{ x: 1710 }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún objetivo coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <ObjetivoFormModal open={modalAbierto} objetivo={objetivoEditando} onClose={() => setModalAbierto(false)} />
       <GestionarActividadesModal

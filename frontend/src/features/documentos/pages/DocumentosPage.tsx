@@ -1,10 +1,12 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { EyeOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { DocumentoFormModal } from '../components/DocumentoFormModal';
+import { PrevisualizarDocumentoModal } from '../components/PrevisualizarDocumentoModal';
 import { eliminarDocumento, fetchDocumentos } from '../api';
 import type { Documento, EstadoDocumento, TipoDocumento } from '../types';
 
@@ -15,6 +17,10 @@ const NOMBRE_TIPO: Record<TipoDocumento, string> = {
   FORMATO: 'Formato',
   REGISTRO: 'Registro',
   INSTRUCTIVO: 'Instructivo',
+  PLAN: 'Plan',
+  MATRIZ: 'Matriz',
+  GUIA: 'Guía',
+  PROGRAMA: 'Programa',
 };
 
 const COLOR_ESTADO: Record<EstadoDocumento, string> = {
@@ -31,6 +37,28 @@ export function DocumentosPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ['documentos'], queryFn: fetchDocumentos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [documentoEditando, setDocumentoEditando] = useState<Documento | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+  const [previsualizarAbierto, setPrevisualizarAbierto] = useState(false);
+  const [documentoParaPrevisualizar, setDocumentoParaPrevisualizar] = useState<Documento | null>(null);
+
+  // Filtro instantáneo en el cliente: el listado completo ya viaja en un solo request
+  // (no hay paginación en este módulo), así que filtrar localmente responde al instante
+  // en cada tecla, sin la latencia ni la carga al servidor de repetir la consulta por AJAX.
+  const documentos = data?.results ?? [];
+  const documentosFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return documentos;
+    return documentos.filter((documento) => {
+      const campos = [
+        documento.codigo,
+        documento.titulo,
+        documento.descripcion,
+        NOMBRE_TIPO[documento.tipo],
+        documento.propietario_nombre,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [documentos, busqueda]);
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarDocumento,
@@ -49,6 +77,11 @@ export function DocumentosPage() {
   function abrirEditar(documento: Documento) {
     setDocumentoEditando(documento);
     setModalAbierto(true);
+  }
+
+  function abrirPrevisualizacion(documento: Documento) {
+    setDocumentoParaPrevisualizar(documento);
+    setPrevisualizarAbierto(true);
   }
 
   const columns = [
@@ -74,6 +107,18 @@ export function DocumentosPage() {
     },
     { title: 'Propietario', dataIndex: 'propietario_nombre', key: 'propietario_nombre' },
     { title: 'Próxima revisión', dataIndex: 'fecha_proxima_revision', key: 'fecha_proxima_revision' },
+    {
+      title: 'Archivo',
+      key: 'archivo',
+      render: (_: unknown, documento: Documento) =>
+        documento.archivo ? (
+          <Button size="small" icon={<EyeOutlined />} onClick={() => abrirPrevisualizacion(documento)}>
+            Ver
+          </Button>
+        ) : (
+          '—'
+        ),
+    },
     {
       title: 'Acciones',
       key: 'acciones',
@@ -107,14 +152,45 @@ export function DocumentosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los documentos" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por código, título, descripción, tipo o propietario..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 420 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {documentosFiltrados.length} de {documentos.length} documentos
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
-        dataSource={data?.results ?? []}
+        dataSource={documentosFiltrados}
         pagination={false}
+        locale={{
+          emptyText: busqueda ? (
+            <Empty description={`Ningún documento coincide con "${busqueda}".`} />
+          ) : undefined,
+        }}
       />
       <DocumentoFormModal open={modalAbierto} documento={documentoEditando} onClose={() => setModalAbierto(false)} />
+      <PrevisualizarDocumentoModal
+        open={previsualizarAbierto}
+        titulo={
+          documentoParaPrevisualizar
+            ? `${documentoParaPrevisualizar.codigo} — ${documentoParaPrevisualizar.titulo}`
+            : 'Documento'
+        }
+        documentoId={documentoParaPrevisualizar?.id ?? null}
+        archivo={documentoParaPrevisualizar?.archivo ?? null}
+        onClose={() => setPrevisualizarAbierto(false)}
+      />
     </Card>
   );
 }

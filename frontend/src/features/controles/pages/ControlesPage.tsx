@@ -1,8 +1,10 @@
+import { SearchOutlined } from '@ant-design/icons';
 import { useQuery } from '@tanstack/react-query';
-import { Button, Card, Table, Tag, Typography } from 'antd';
+import { Button, Card, Empty, Input, Table, Tag, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { AplicabilidadFormModal } from '../components/AplicabilidadFormModal';
 import { fetchSoa } from '../api';
 import type { AplicabilidadControl, CategoriaControl, EstadoImplementacion } from '../types';
@@ -51,14 +53,35 @@ export function ControlesPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ['soa'], queryFn: fetchSoa });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [aplicabilidadEditando, setAplicabilidadEditando] = useState<AplicabilidadControl | null>(null);
+  const [busqueda, setBusqueda] = useState('');
 
   function abrirEditar(aplicabilidad: AplicabilidadControl) {
     setAplicabilidadEditando(aplicabilidad);
     setModalAbierto(true);
   }
 
+  const controles = data?.results ?? [];
+  const controlesFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return controles;
+    return controles.filter((c) => {
+      const campos = [
+        c.control_codigo,
+        c.control_nombre,
+        c.control_descripcion,
+        NOMBRE_ESTADO[c.estado_implementacion],
+        c.justificacion,
+        c.referencia_documento,
+        c.observaciones,
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [controles, busqueda]);
+
+  // Filtrar antes de agrupar: así un encabezado de categoría solo aparece si le queda
+  // al menos un control que coincida con la búsqueda, en vez de mostrar categorías vacías.
   const filas = useMemo<FilaTabla[]>(() => {
-    const ordenados = [...(data?.results ?? [])].sort(compararPorCodigo);
+    const ordenados = [...controlesFiltrados].sort(compararPorCodigo);
     const resultado: FilaTabla[] = [];
     let categoriaAnterior: CategoriaControl | null = null;
     for (const item of ordenados) {
@@ -69,7 +92,7 @@ export function ControlesPage() {
       resultado.push(item);
     }
     return resultado;
-  }, [data]);
+  }, [controlesFiltrados]);
 
   function celdaTexto(texto: string, ancho: number) {
     return texto ? (
@@ -176,6 +199,21 @@ export function ControlesPage() {
   return (
     <Card title="Controles Anexo A — Declaración de Aplicabilidad (SoA)">
       <ErrorCarga visible={isError} entidad="los controles" />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por número, nombre, descripción, estado, justificación u observaciones..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 480 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {controlesFiltrados.length} de {controles.length} controles
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey={(fila: FilaTabla) => String(fila.id)}
         loading={isLoading}
@@ -183,6 +221,9 @@ export function ControlesPage() {
         dataSource={filas}
         pagination={false}
         scroll={{ x: 1450 }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún control coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <AplicabilidadFormModal
         open={modalAbierto}

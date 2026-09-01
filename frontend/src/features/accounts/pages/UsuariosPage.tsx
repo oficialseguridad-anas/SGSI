@@ -1,8 +1,9 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
-import { useState } from 'react';
+import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
+import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { UsuarioFormModal } from '../components/UsuarioFormModal';
 import { eliminarUsuario, fetchUsuarios } from '../api';
 import type { Usuario } from '../types';
@@ -13,6 +14,23 @@ export function UsuariosPage() {
   const { data, isLoading } = useQuery({ queryKey: ['usuarios'], queryFn: fetchUsuarios });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  const [busqueda, setBusqueda] = useState('');
+
+  const usuarios = data?.results ?? [];
+  const usuariosFiltrados = useMemo(() => {
+    const termino = normalizarTexto(busqueda.trim());
+    if (!termino) return usuarios;
+    return usuarios.filter((u) => {
+      const campos = [
+        u.email,
+        u.nombre_completo,
+        u.cargo,
+        u.direccion_nombre,
+        ...u.roles.map((r) => r.nombre),
+      ];
+      return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
+    });
+  }, [usuarios, busqueda]);
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarUsuario,
@@ -88,13 +106,31 @@ export function UsuariosPage() {
       title="Usuarios"
       extra={<Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo usuario</Button>}
     >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+        <Input
+          allowClear
+          prefix={<SearchOutlined style={{ color: '#898781' }} />}
+          placeholder="Buscar por email, nombre, cargo, dirección o rol..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          style={{ maxWidth: 420 }}
+        />
+        {busqueda && (
+          <Typography.Text type="secondary">
+            {usuariosFiltrados.length} de {usuarios.length} usuarios
+          </Typography.Text>
+        )}
+      </div>
       <Table
         rowKey="id"
         loading={isLoading}
         columns={columns}
-        dataSource={data?.results ?? []}
+        dataSource={usuariosFiltrados}
         pagination={false}
         scroll={{ x: 'max-content' }}
+        locale={{
+          emptyText: busqueda ? <Empty description={`Ningún usuario coincide con "${busqueda}".`} /> : undefined,
+        }}
       />
       <UsuarioFormModal open={modalAbierto} usuario={usuarioEditando} onClose={() => setModalAbierto(false)} />
     </Card>
