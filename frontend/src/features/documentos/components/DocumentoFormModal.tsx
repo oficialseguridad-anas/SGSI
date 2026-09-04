@@ -8,16 +8,17 @@ import { actualizarDocumento, crearDocumento } from '../api';
 import type { Documento, DocumentoInput } from '../types';
 
 const OPCIONES_TIPO = [
+  { value: 'FORMATO', label: 'Formato' },
+  { value: 'GUIA', label: 'Guía' },
+  { value: 'INSTRUCTIVO', label: 'Instructivo' },
+  { value: 'MANUAL', label: 'Manual' },
+  { value: 'MATRIZ', label: 'Matriz' },
+  { value: 'PLAN', label: 'Plan' },
   { value: 'POLITICA', label: 'Política' },
   { value: 'PROCEDIMIENTO', label: 'Procedimiento' },
-  { value: 'MANUAL', label: 'Manual' },
-  { value: 'FORMATO', label: 'Formato' },
-  { value: 'REGISTRO', label: 'Registro' },
-  { value: 'INSTRUCTIVO', label: 'Instructivo' },
-  { value: 'PLAN', label: 'Plan' },
-  { value: 'MATRIZ', label: 'Matriz' },
-  { value: 'GUIA', label: 'Guía' },
   { value: 'PROGRAMA', label: 'Programa' },
+  { value: 'PROTOCOLO', label: 'Protocolo' },
+  { value: 'REGISTRO', label: 'Registro' },
 ];
 
 const OPCIONES_ESTADO = [

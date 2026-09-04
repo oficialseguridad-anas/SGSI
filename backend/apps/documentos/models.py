@@ -7,16 +7,17 @@ from apps.core.validators import validar_extension_archivo, validar_tamano_archi
 
 class Documento(TimeStampedModel):
     class Tipo(models.TextChoices):
+        FORMATO = 'FORMATO', 'Formato'
+        GUIA = 'GUIA', 'Guía'
+        INSTRUCTIVO = 'INSTRUCTIVO', 'Instructivo'
+        MANUAL = 'MANUAL', 'Manual'
+        MATRIZ = 'MATRIZ', 'Matriz'
+        PLAN = 'PLAN', 'Plan'
         POLITICA = 'POLITICA', 'Política'
         PROCEDIMIENTO = 'PROCEDIMIENTO', 'Procedimiento'
-        MANUAL = 'MANUAL', 'Manual'
-        FORMATO = 'FORMATO', 'Formato'
-        REGISTRO = 'REGISTRO', 'Registro'
-        INSTRUCTIVO = 'INSTRUCTIVO', 'Instructivo'
-        PLAN = 'PLAN', 'Plan'
-        MATRIZ = 'MATRIZ', 'Matriz'
-        GUIA = 'GUIA', 'Guía'
         PROGRAMA = 'PROGRAMA', 'Programa'
+        PROTOCOLO = 'PROTOCOLO', 'Protocolo'
+        REGISTRO = 'REGISTRO', 'Registro'
 
     class Estado(models.TextChoices):
         BORRADOR = 'BORRADOR', 'Borrador'

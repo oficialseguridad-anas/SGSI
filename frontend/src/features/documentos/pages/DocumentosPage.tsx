@@ -11,16 +11,17 @@ import { eliminarDocumento, fetchDocumentos } from '../api';
 import type { Documento, EstadoDocumento, TipoDocumento } from '../types';
 
 const NOMBRE_TIPO: Record<TipoDocumento, string> = {
+  FORMATO: 'Formato',
+  GUIA: 'Guía',
+  INSTRUCTIVO: 'Instructivo',
+  MANUAL: 'Manual',
+  MATRIZ: 'Matriz',
+  PLAN: 'Plan',
   POLITICA: 'Política',
   PROCEDIMIENTO: 'Procedimiento',
-  MANUAL: 'Manual',
-  FORMATO: 'Formato',
-  REGISTRO: 'Registro',
-  INSTRUCTIVO: 'Instructivo',
-  PLAN: 'Plan',
-  MATRIZ: 'Matriz',
-  GUIA: 'Guía',
   PROGRAMA: 'Programa',
+  PROTOCOLO: 'Protocolo',
+  REGISTRO: 'Registro',
 };
 
 const COLOR_ESTADO: Record<EstadoDocumento, string> = {
