@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'apps.indicadores',
     'apps.objetivos',
     'apps.auditorias',
+    'apps.incidentes',
 ]
 
 MIDDLEWARE = [

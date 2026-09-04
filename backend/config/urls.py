@@ -18,6 +18,7 @@ urlpatterns = [
     path('api/v1/', include('apps.indicadores.urls')),
     path('api/v1/', include('apps.objetivos.urls')),
     path('api/v1/', include('apps.auditorias.urls')),
+    path('api/v1/', include('apps.incidentes.urls')),
 ]
 
 # El explorador de la API (esquema OpenAPI + Swagger UI) revela la estructura completa

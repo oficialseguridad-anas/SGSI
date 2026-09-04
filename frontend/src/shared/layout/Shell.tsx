@@ -1,9 +1,11 @@
 import {
   AimOutlined,
+  AlertOutlined,
   AuditOutlined,
   DashboardOutlined,
   DatabaseOutlined,
   FileTextOutlined,
+  FolderOutlined,
   KeyOutlined,
   LineChartOutlined,
   LogoutOutlined,
@@ -14,7 +16,7 @@ import {
   TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
-import { Avatar, Button, Dropdown, Layout, Menu } from 'antd';
+import { Avatar, Button, Dropdown, Layout, Menu, type MenuProps } from 'antd';
 import { useMemo, useState, type SyntheticEvent } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
@@ -28,11 +30,12 @@ const { Header, Sider, Content } = Layout;
 
 interface NavItem {
   key: string;
-  path: string;
+  path?: string;
   label: string;
   icon: React.ReactNode;
   perm?: string;
   adminOnly?: boolean;
+  children?: NavItem[];
 }
 
 const NAV_ITEMS: NavItem[] = [
@@ -47,11 +50,29 @@ const NAV_ITEMS: NavItem[] = [
     perm: 'controles.view_aplicabilidadcontrol',
   },
   {
+    key: 'seguimiento-anexo-a',
+    label: 'Seguimiento Anexo A',
+    icon: <FolderOutlined />,
+    children: [
+      { key: 'seguimiento-organizacionales', path: '/seguimiento-anexo-a/organizacionales', label: 'Organizacionales', icon: null },
+      { key: 'seguimiento-personas', path: '/seguimiento-anexo-a/personas', label: 'Personas', icon: null },
+      { key: 'seguimiento-fisicos', path: '/seguimiento-anexo-a/fisicos', label: 'Físicos', icon: null },
+      { key: 'seguimiento-tecnologicos', path: '/seguimiento-anexo-a/tecnologicos', label: 'Tecnológicos', icon: null },
+    ],
+  },
+  {
     key: 'hallazgos',
     path: '/hallazgos',
     label: 'Hallazgos de auditoría',
     icon: <AuditOutlined />,
     perm: 'auditorias.view_hallazgo',
+  },
+  {
+    key: 'incidentes',
+    path: '/incidentes',
+    label: 'Matriz de incidentes',
+    icon: <AlertOutlined />,
+    perm: 'incidentes.view_incidente',
   },
   {
     key: 'documentos',
@@ -84,19 +105,31 @@ export function Shell() {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
-  const items = useMemo(
-    () =>
-      NAV_ITEMS.filter((item) => (!item.perm || hasPerm(item.perm)) && (!item.adminOnly || user?.is_superuser)).map(
-        (item) => ({
-          key: item.key,
-          icon: item.icon,
-          label: <Link to={item.path}>{item.label}</Link>,
-        }),
-      ),
-    [user],
-  );
+  const items = useMemo(() => {
+    function construir(navItems: NavItem[]): NonNullable<MenuProps['items']> {
+      return navItems
+        .filter((item) => (!item.perm || hasPerm(item.perm)) && (!item.adminOnly || user?.is_superuser))
+        .map((item) =>
+          item.children
+            ? { key: item.key, icon: item.icon, label: item.label, children: construir(item.children) }
+            : { key: item.key, icon: item.icon, label: <Link to={item.path!}>{item.label}</Link> },
+        );
+    }
+    return construir(NAV_ITEMS);
+  }, [user]);
 
-  const selectedKey = NAV_ITEMS.find((item) => item.path === location.pathname)?.key ?? 'dashboard';
+  function encontrarSeleccionado(navItems: NavItem[], pathname: string): string | undefined {
+    for (const item of navItems) {
+      if (item.path === pathname) return item.key;
+      if (item.children) {
+        const encontrado = encontrarSeleccionado(item.children, pathname);
+        if (encontrado) return encontrado;
+      }
+    }
+    return undefined;
+  }
+
+  const selectedKey = encontrarSeleccionado(NAV_ITEMS, location.pathname) ?? 'dashboard';
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
