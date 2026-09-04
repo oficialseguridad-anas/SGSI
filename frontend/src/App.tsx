@@ -13,6 +13,7 @@ import { IndicadoresPage } from './features/indicadores/pages/IndicadoresPage';
 import { ObjetivosPage } from './features/objetivos/pages/ObjetivosPage';
 import { RiesgosPage } from './features/riesgos/pages/RiesgosPage';
 import { SeguimientoCategoriaPage } from './features/seguimientoAnexoA/pages/SeguimientoCategoriaPage';
+import { SeguimientoPersonasPage } from './features/seguimientoAnexoA/pages/SeguimientoPersonasPage';
 import { AdminRoute } from './shared/layout/AdminRoute';
 import { PrivateRoute } from './shared/layout/PrivateRoute';
 import { Shell } from './shared/layout/Shell';
@@ -32,10 +33,7 @@ export default function App() {
             path="/seguimiento-anexo-a/organizacionales"
             element={<SeguimientoCategoriaPage categoria="ORGANIZACIONAL" titulo="Controles organizacionales" />}
           />
-          <Route
-            path="/seguimiento-anexo-a/personas"
-            element={<SeguimientoCategoriaPage categoria="PERSONAS" titulo="Controles de personas" />}
-          />
+          <Route path="/seguimiento-anexo-a/personas" element={<SeguimientoPersonasPage />} />
           <Route
             path="/seguimiento-anexo-a/fisicos"
             element={<SeguimientoCategoriaPage categoria="FISICO" titulo="Controles físicos" />}

@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'apps.objetivos',
     'apps.auditorias',
     'apps.incidentes',
+    'apps.revisiones',
 ]
 
 MIDDLEWARE = [
