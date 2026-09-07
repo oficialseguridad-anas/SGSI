@@ -1,12 +1,12 @@
 import { LockOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Popconfirm, Space, Table, Tag, message } from 'antd';
 import { useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
-import { BRAND } from '../../../shared/theme/brand';
 import { eliminarRevisionPersonas, fetchRevisionesPersonas } from '../api';
 import { ChecklistPersonasModal } from '../components/ChecklistPersonasModal';
+import { EncabezadoRevisionAnexoA } from '../components/EncabezadoRevisionAnexoA';
 import { RevisionPersonasFormModal } from '../components/RevisionPersonasFormModal';
 import { TablaCriteriosResultado } from '../components/TablaCriteriosResultado';
 import type { RevisionPersonas } from '../types';
@@ -64,6 +64,18 @@ export function SeguimientoPersonasPage() {
     },
     { title: 'Muestra seleccionada', dataIndex: 'muestra_seleccionada', key: 'muestra_seleccionada', render: (t: string) => t || '—' },
     {
+      title: '% Cumplimiento',
+      dataIndex: 'porcentaje_general',
+      key: 'porcentaje_general',
+      width: 130,
+      render: (porcentaje: number | null) =>
+        porcentaje === null ? (
+          '—'
+        ) : (
+          <Tag color={porcentaje >= 80 ? 'green' : porcentaje >= 50 ? 'gold' : 'red'}>{porcentaje}%</Tag>
+        ),
+    },
+    {
       title: 'Checklist',
       key: 'checklist',
       width: 170,
@@ -107,31 +119,10 @@ export function SeguimientoPersonasPage() {
   return (
     <div>
       <Card style={{ marginBottom: 16 }}>
-        <div style={{ borderLeft: `4px solid ${BRAND.teal}`, paddingLeft: 16 }}>
-          <Typography.Title level={3} style={{ color: BRAND.tealDark, marginBottom: 4 }}>
-            Revisión de los Controles de Seguridad de la Información en Recursos Humanos
-          </Typography.Title>
-          <Typography.Text strong style={{ fontSize: 15 }}>
-            Controles A.6.1 a A.6.8 — ISO/IEC 27001:2022
-          </Typography.Text>
-        </div>
-        <Typography.Title level={5} style={{ textAlign: 'center', color: BRAND.teal, marginTop: 20 }}>
-          ANAS WAYUU EPSI
-        </Typography.Title>
-        <Typography.Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 20 }}>
-          Uso: guía de campo / checklist / registro de evidencia
-        </Typography.Text>
-        <div style={{ background: BRAND.bg, border: `1px solid ${BRAND.tealLight}33`, borderRadius: 6, padding: 16 }}>
-          <Typography.Text strong style={{ color: BRAND.tealDark, display: 'block', marginBottom: 6 }}>
-            Propósito del documento
-          </Typography.Text>
-          <Typography.Text>
-            Servir como instrumento práctico para realizar una primera revisión de la implementación y eficacia de
-            los controles A.6.1 a A.6.8 mediante muestreo, entrevistas, revisión documental y verificación de
-            evidencias reales. No sustituye una auditoría formal del SGSI.
-          </Typography.Text>
-        </div>
-
+        <EncabezadoRevisionAnexoA
+          titulo="Revisión de los Controles de Seguridad de la Información en Recursos Humanos"
+          rangoControles="A.6.1 a A.6.8"
+        />
         <TablaCriteriosResultado />
       </Card>
 

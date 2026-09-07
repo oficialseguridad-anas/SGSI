@@ -28,3 +28,14 @@ export const COLOR_RESULTADO_CHECKLIST: Record<ResultadoChecklist, string> = {
   NC: 'red',
   NE: 'default',
 };
+
+// Cuánto vale cada resultado hacia el % de cumplimiento de su pregunta — mismo criterio
+// que RespuestaChecklistPersonas.PUNTAJE_POR_RESULTADO en el backend (ambos deben
+// coincidir siempre). Sin responder ('') cuenta como 0, igual que No cumple/No evidenciado.
+export const PUNTAJE_RESULTADO_CHECKLIST: Record<string, number> = {
+  C: 100,
+  CP: 50,
+  NC: 0,
+  NE: 0,
+  '': 0,
+};

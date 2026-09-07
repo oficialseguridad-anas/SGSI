@@ -1,3 +1,9 @@
+export interface PorcentajeControlPersonas {
+  control_codigo: string;
+  control_nombre: string;
+  porcentaje: number;
+}
+
 export interface RevisionPersonas {
   id: number;
   fecha_revision: string;
@@ -9,6 +15,8 @@ export interface RevisionPersonas {
   responsable_tecnologia_nombre: string;
   muestra_seleccionada: string;
   finalizada: boolean;
+  porcentaje_general: number | null;
+  porcentajes_por_control: PorcentajeControlPersonas[];
   creado_en: string;
   actualizado_en: string;
 }

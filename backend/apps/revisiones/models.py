@@ -50,6 +50,39 @@ class RevisionPersonas(TimeStampedModel):
     def __str__(self):
         return f'Revisión Personas {self.fecha_revision}'
 
+    @property
+    def porcentaje_general(self):
+        """Promedio del puntaje de todas las respuestas de la revisión (todas las
+        preguntas pesan igual): 100% solo si todas quedaron en 'Cumple'."""
+        respuestas = list(self.respuestas_checklist.all())
+        if not respuestas:
+            return None
+        return round(sum(r.puntaje for r in respuestas) / len(respuestas), 1)
+
+    @property
+    def porcentajes_por_control(self):
+        """Mismo cálculo que porcentaje_general, pero desglosado por cada control
+        (A.6.1, A.6.2, ...) en vez de sobre el total de la revisión."""
+        grupos = {}
+        orden = []
+        respuestas = self.respuestas_checklist.select_related('pregunta').order_by(
+            'pregunta__control_codigo', 'pregunta__numero'
+        )
+        for r in respuestas:
+            clave = r.pregunta.control_codigo
+            if clave not in grupos:
+                grupos[clave] = {'control_nombre': r.pregunta.control_nombre, 'puntajes': []}
+                orden.append(clave)
+            grupos[clave]['puntajes'].append(r.puntaje)
+        return [
+            {
+                'control_codigo': clave,
+                'control_nombre': grupos[clave]['control_nombre'],
+                'porcentaje': round(sum(grupos[clave]['puntajes']) / len(grupos[clave]['puntajes']), 1),
+            }
+            for clave in orden
+        ]
+
 
 class PreguntaChecklistPersonas(models.Model):
     """Catálogo (fijo, no editable en operación) de las preguntas del checklist de
@@ -83,6 +116,16 @@ class RespuestaChecklistPersonas(TimeStampedModel):
         NO_CUMPLE = 'NC', 'NC - No cumple'
         NO_EVIDENCIADO = 'NE', 'NE - No evidenciado'
 
+    # Cuánto vale cada resultado hacia el % de cumplimiento de su pregunta — así todas las
+    # preguntas en "Cumple" dan 100%. Cumple parcialmente cuenta la mitad; no cumple, no
+    # evidenciado y sin responder no suman nada (mismo criterio para las tres).
+    PUNTAJE_POR_RESULTADO = {
+        Resultado.CUMPLE: 100,
+        Resultado.CUMPLE_PARCIAL: 50,
+        Resultado.NO_CUMPLE: 0,
+        Resultado.NO_EVIDENCIADO: 0,
+    }
+
     revision = models.ForeignKey(
         RevisionPersonas, on_delete=models.CASCADE, related_name='respuestas_checklist', db_column='revisionId'
     )
@@ -103,3 +146,7 @@ class RespuestaChecklistPersonas(TimeStampedModel):
 
     def __str__(self):
         return f'{self.revision} - {self.pregunta}'
+
+    @property
+    def puntaje(self):
+        return self.PUNTAJE_POR_RESULTADO.get(self.resultado, 0)

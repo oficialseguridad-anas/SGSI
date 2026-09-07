@@ -11,6 +11,8 @@ class RevisionPersonasSerializer(serializers.ModelSerializer):
     responsable_tecnologia_nombre = serializers.CharField(
         source='responsable_tecnologia.nombre_completo', read_only=True
     )
+    porcentaje_general = serializers.FloatField(read_only=True)
+    porcentajes_por_control = serializers.ReadOnlyField()
 
     class Meta:
         model = RevisionPersonas
@@ -18,7 +20,8 @@ class RevisionPersonasSerializer(serializers.ModelSerializer):
             'id', 'fecha_revision', 'revisor', 'revisor_nombre',
             'responsable_talento_humano', 'responsable_talento_humano_nombre',
             'responsable_tecnologia', 'responsable_tecnologia_nombre',
-            'muestra_seleccionada', 'finalizada', 'creado_en', 'actualizado_en',
+            'muestra_seleccionada', 'finalizada', 'porcentaje_general', 'porcentajes_por_control',
+            'creado_en', 'actualizado_en',
         ]
         read_only_fields = ['id', 'creado_en', 'actualizado_en']
 

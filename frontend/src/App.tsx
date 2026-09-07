@@ -31,16 +31,34 @@ export default function App() {
           <Route path="/controles" element={<ControlesPage />} />
           <Route
             path="/seguimiento-anexo-a/organizacionales"
-            element={<SeguimientoCategoriaPage categoria="ORGANIZACIONAL" titulo="Controles organizacionales" />}
+            element={
+              <SeguimientoCategoriaPage
+                categoria="ORGANIZACIONAL"
+                titulo="Revisión de los Controles Organizacionales de Seguridad de la Información"
+                rangoControles="A.5.1 a A.5.37"
+              />
+            }
           />
           <Route path="/seguimiento-anexo-a/personas" element={<SeguimientoPersonasPage />} />
           <Route
             path="/seguimiento-anexo-a/fisicos"
-            element={<SeguimientoCategoriaPage categoria="FISICO" titulo="Controles físicos" />}
+            element={
+              <SeguimientoCategoriaPage
+                categoria="FISICO"
+                titulo="Revisión de los Controles Físicos de Seguridad de la Información"
+                rangoControles="A.7.1 a A.7.14"
+              />
+            }
           />
           <Route
             path="/seguimiento-anexo-a/tecnologicos"
-            element={<SeguimientoCategoriaPage categoria="TECNOLOGICO" titulo="Controles tecnológicos" />}
+            element={
+              <SeguimientoCategoriaPage
+                categoria="TECNOLOGICO"
+                titulo="Revisión de los Controles Tecnológicos de Seguridad de la Información"
+                rangoControles="A.8.1 a A.8.34"
+              />
+            }
           />
           <Route path="/hallazgos" element={<HallazgosPage />} />
           <Route path="/incidentes" element={<IncidentesPage />} />

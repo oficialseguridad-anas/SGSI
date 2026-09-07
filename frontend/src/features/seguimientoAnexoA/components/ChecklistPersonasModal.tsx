@@ -9,7 +9,11 @@ import {
   finalizarRevisionPersonas,
   fetchRespuestasChecklistPersonas,
 } from '../api';
-import { NOMBRE_RESULTADO_CHECKLIST, ORDEN_RESULTADO_CHECKLIST } from '../resultadoChecklist';
+import {
+  NOMBRE_RESULTADO_CHECKLIST,
+  ORDEN_RESULTADO_CHECKLIST,
+  PUNTAJE_RESULTADO_CHECKLIST,
+} from '../resultadoChecklist';
 import type { RevisionPersonas } from '../types';
 
 const OPCIONES_RESULTADO = ORDEN_RESULTADO_CHECKLIST.map((clave) => ({
@@ -70,6 +74,10 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
       }
       if (revision) {
         queryClient.invalidateQueries({ queryKey: ['respuestas-checklist-personas', revision.id], refetchType: 'none' });
+        // El "% Cumplimiento" de la tabla de revisiones se calcula en el backend — se
+        // refresca con cada respuesta guardada (no solo al finalizar) para que se vea
+        // avanzar en línea, incluso si el usuario cierra el modal sin "Guardar y cerrar".
+        queryClient.invalidateQueries({ queryKey: ['revisiones-personas'] });
       }
     } catch {
       if (versionFila.current[id] === version) {
@@ -114,19 +122,52 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
   }
 
   const respuestas = data?.results ?? [];
-  const controlCodigo = respuestas[0]?.pregunta_control_codigo;
-  const controlNombre = respuestas[0]?.pregunta_control_nombre;
+  // Agrupa por control (A.6.1, A.6.2, ...) preservando el orden en que ya vienen del
+  // backend (pregunta__control_codigo, numero) — cada grupo se muestra en su propia
+  // tabla, con el encabezado "A.6.X Nombre del control".
+  const grupos: { controlCodigo: string; controlNombre: string; respuestas: typeof respuestas }[] = [];
+  for (const r of respuestas) {
+    const grupoActual = grupos[grupos.length - 1];
+    if (grupoActual && grupoActual.controlCodigo === r.pregunta_control_codigo) {
+      grupoActual.respuestas.push(r);
+    } else {
+      grupos.push({
+        controlCodigo: r.pregunta_control_codigo,
+        controlNombre: r.pregunta_control_nombre,
+        respuestas: [r],
+      });
+    }
+  }
   const completo = filas.length > 0 && filas.every((f) => f.resultado !== '');
   const finalizada = Boolean(revision?.finalizada);
   const soloLectura = finalizada && !esAdministrador;
+
+  // Calculado en vivo a partir de las respuestas locales (no del valor guardado en el
+  // servidor), para que el % se actualice al instante mientras se va diligenciando.
+  function calcularPorcentaje(ids: number[]): number {
+    if (ids.length === 0) return 0;
+    const suma = ids.reduce((acumulado, id) => {
+      const fila = filas.find((f) => f.id === id);
+      return acumulado + (PUNTAJE_RESULTADO_CHECKLIST[fila?.resultado ?? ''] ?? 0);
+    }, 0);
+    return Math.round((suma / ids.length) * 10) / 10;
+  }
+
+  const porcentajeGeneral = calcularPorcentaje(filas.map((f) => f.id));
+  const colorPorcentaje = (valor: number) => (valor >= 80 ? 'green' : valor >= 50 ? 'gold' : 'red');
 
   return (
     <Modal
       title={
         <span>
           {revision ? `Checklist — Revisión ${revision.fecha_revision}` : 'Checklist'}
+          {respuestas.length > 0 && (
+            <Tag color={colorPorcentaje(porcentajeGeneral)} style={{ marginLeft: 10 }}>
+              {porcentajeGeneral}% cumplimiento
+            </Tag>
+          )}
           {finalizada && (
-            <Tag icon={<LockOutlined />} color={esAdministrador ? 'gold' : 'default'} style={{ marginLeft: 10 }}>
+            <Tag icon={<LockOutlined />} color={esAdministrador ? 'gold' : 'default'} style={{ marginLeft: 4 }}>
               Finalizado
             </Tag>
           )}
@@ -185,56 +226,66 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
               }
             />
           )}
-          <h3 style={{ color: BRAND.tealDark, marginTop: 0 }}>
-            {controlCodigo} {controlNombre}
-          </h3>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr>
-                  <th style={celdaEncabezado({ width: 40 })}>N.</th>
-                  <th style={celdaEncabezado({})}>Pregunta / criterio</th>
-                  <th style={celdaEncabezado({ width: 160 })}>Resultado (C / CP / NC / NE)</th>
-                  <th style={celdaEncabezado({ width: 220 })}>Evidencia / observación</th>
-                  <th style={celdaEncabezado({ width: 36 })} aria-label="Estado de guardado" />
-                </tr>
-              </thead>
-              <tbody>
-                {respuestas.map((r) => {
-                  const fila = filas.find((f) => f.id === r.id);
-                  return (
-                    <tr key={r.id}>
-                      <td style={celdaCuerpo()}>{r.pregunta_numero}</td>
-                      <td style={celdaCuerpo()}>{r.pregunta_texto}</td>
-                      <td style={celdaCuerpo()}>
-                        <Select
-                          allowClear
-                          size="small"
-                          disabled={soloLectura}
-                          style={{ width: '100%' }}
-                          options={OPCIONES_RESULTADO}
-                          value={fila?.resultado || undefined}
-                          onChange={(valor) => alCambiarResultado(r.id, valor ?? '')}
-                        />
-                      </td>
-                      <td style={celdaCuerpo()}>
-                        <Input.TextArea
-                          autoSize={{ minRows: 1, maxRows: 4 }}
-                          disabled={soloLectura}
-                          value={fila?.evidencia ?? ''}
-                          onChange={(e) => actualizarFila(r.id, { evidencia: e.target.value })}
-                          onBlur={() => alSalirDeEvidencia(r.id)}
-                        />
-                      </td>
-                      <td style={{ ...celdaCuerpo(), textAlign: 'center' }}>
-                        <IndicadorGuardado estado={estadoFilas[r.id]} />
-                      </td>
+          {grupos.map((grupo) => {
+            const porcentajeGrupo = calcularPorcentaje(grupo.respuestas.map((r) => r.id));
+            return (
+            <div key={grupo.controlCodigo} style={{ marginBottom: 24 }}>
+              <h3 style={{ color: BRAND.tealDark, marginTop: 0, marginBottom: 8 }}>
+                {grupo.controlCodigo} {grupo.controlNombre}{' '}
+                <Tag color={colorPorcentaje(porcentajeGrupo)} style={{ fontWeight: 400 }}>
+                  {porcentajeGrupo}%
+                </Tag>
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr>
+                      <th style={celdaEncabezado({ width: 40 })}>N.</th>
+                      <th style={celdaEncabezado({})}>Pregunta / criterio</th>
+                      <th style={celdaEncabezado({ width: 160 })}>Resultado (C / CP / NC / NE)</th>
+                      <th style={celdaEncabezado({ width: 220 })}>Evidencia / observación</th>
+                      <th style={celdaEncabezado({ width: 36 })} aria-label="Estado de guardado" />
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {grupo.respuestas.map((r) => {
+                      const fila = filas.find((f) => f.id === r.id);
+                      return (
+                        <tr key={r.id}>
+                          <td style={celdaCuerpo()}>{r.pregunta_numero}</td>
+                          <td style={celdaCuerpo()}>{r.pregunta_texto}</td>
+                          <td style={celdaCuerpo()}>
+                            <Select
+                              allowClear
+                              size="small"
+                              disabled={soloLectura}
+                              style={{ width: '100%' }}
+                              options={OPCIONES_RESULTADO}
+                              value={fila?.resultado || undefined}
+                              onChange={(valor) => alCambiarResultado(r.id, valor ?? '')}
+                            />
+                          </td>
+                          <td style={celdaCuerpo()}>
+                            <Input.TextArea
+                              autoSize={{ minRows: 1, maxRows: 4 }}
+                              disabled={soloLectura}
+                              value={fila?.evidencia ?? ''}
+                              onChange={(e) => actualizarFila(r.id, { evidencia: e.target.value })}
+                              onBlur={() => alSalirDeEvidencia(r.id)}
+                            />
+                          </td>
+                          <td style={{ ...celdaCuerpo(), textAlign: 'center' }}>
+                            <IndicadorGuardado estado={estadoFilas[r.id]} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            );
+          })}
         </>
       )}
 
