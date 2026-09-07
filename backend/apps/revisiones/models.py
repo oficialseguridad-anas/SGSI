@@ -34,6 +34,12 @@ class RevisionPersonas(TimeStampedModel):
     muestra_seleccionada = models.CharField(
         max_length=300, blank=True, verbose_name='Muestra seleccionada', db_column='muestraSeleccionada'
     )
+    finalizada = models.BooleanField(
+        default=False,
+        verbose_name='Finalizada',
+        db_column='finalizada',
+        help_text='Una vez finalizada, el checklist queda de solo lectura salvo para administradores.',
+    )
 
     class Meta:
         verbose_name = 'revisión de controles de personas'

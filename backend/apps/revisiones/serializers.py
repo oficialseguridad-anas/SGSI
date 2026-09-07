@@ -18,7 +18,7 @@ class RevisionPersonasSerializer(serializers.ModelSerializer):
             'id', 'fecha_revision', 'revisor', 'revisor_nombre',
             'responsable_talento_humano', 'responsable_talento_humano_nombre',
             'responsable_tecnologia', 'responsable_tecnologia_nombre',
-            'muestra_seleccionada', 'creado_en', 'actualizado_en',
+            'muestra_seleccionada', 'finalizada', 'creado_en', 'actualizado_en',
         ]
         read_only_fields = ['id', 'creado_en', 'actualizado_en']
 

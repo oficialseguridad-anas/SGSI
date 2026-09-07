@@ -1,6 +1,6 @@
-import { PlusOutlined } from '@ant-design/icons';
+import { LockOutlined, PlusOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Popconfirm, Space, Table, Typography, message } from 'antd';
+import { Button, Card, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
@@ -70,11 +70,18 @@ export function SeguimientoPersonasPage() {
     {
       title: 'Checklist',
       key: 'checklist',
-      width: 110,
+      width: 170,
       render: (_: unknown, revision: RevisionPersonas) => (
-        <Button size="small" onClick={() => abrirChecklist(revision)}>
-          Abrir
-        </Button>
+        <Space>
+          <Button size="small" onClick={() => abrirChecklist(revision)}>
+            Abrir
+          </Button>
+          {revision.finalizada && (
+            <Tag icon={<LockOutlined />} color="gold">
+              Finalizado
+            </Tag>
+          )}
+        </Space>
       ),
     },
     {

@@ -1,8 +1,14 @@
+import { CheckCircleFilled, LoadingOutlined, LockOutlined, WarningFilled } from '@ant-design/icons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Alert, Input, Modal, Select, Skeleton, message } from 'antd';
-import { useEffect, useState } from 'react';
+import { Alert, Button, Input, Modal, Select, Skeleton, Tag, Tooltip, message } from 'antd';
+import { useEffect, useRef, useState } from 'react';
+import { useAuth } from '../../../app/AuthContext';
 import { BRAND } from '../../../shared/theme/brand';
-import { actualizarRespuestaChecklistPersonas, fetchRespuestasChecklistPersonas } from '../api';
+import {
+  actualizarRespuestaChecklistPersonas,
+  finalizarRevisionPersonas,
+  fetchRespuestasChecklistPersonas,
+} from '../api';
 import { NOMBRE_RESULTADO_CHECKLIST, ORDEN_RESULTADO_CHECKLIST } from '../resultadoChecklist';
 import type { RevisionPersonas } from '../types';
 
@@ -23,10 +29,18 @@ interface FilaEditable {
   evidencia: string;
 }
 
+type EstadoGuardadoFila = 'guardando' | 'guardado' | 'error' | undefined;
+
 export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
+  const { user } = useAuth();
+  const esAdministrador = Boolean(user?.is_superuser);
   const queryClient = useQueryClient();
   const [filas, setFilas] = useState<FilaEditable[]>([]);
   const [guardando, setGuardando] = useState(false);
+  const [estadoFilas, setEstadoFilas] = useState<Record<number, EstadoGuardadoFila>>({});
+  // Evita que la llegada tardía de un guardado anterior pise el resultado de uno más nuevo
+  // para la misma fila (ej. dos cambios seguidos antes de que responda el primer PATCH).
+  const versionFila = useRef<Record<number, number>>({});
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['respuestas-checklist-personas', revision?.id],
@@ -37,6 +51,7 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
   useEffect(() => {
     if (data) {
       setFilas(data.results.map((r) => ({ id: r.id, resultado: r.resultado, evidencia: r.evidencia })));
+      setEstadoFilas({});
     }
   }, [data]);
 
@@ -44,15 +59,52 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
     setFilas((previas) => previas.map((f) => (f.id === id ? { ...f, ...cambios } : f)));
   }
 
+  async function guardarFilaAhora(id: number, valores: Pick<FilaEditable, 'resultado' | 'evidencia'>) {
+    const version = (versionFila.current[id] ?? 0) + 1;
+    versionFila.current[id] = version;
+    setEstadoFilas((previo) => ({ ...previo, [id]: 'guardando' }));
+    try {
+      await actualizarRespuestaChecklistPersonas(id, valores);
+      if (versionFila.current[id] === version) {
+        setEstadoFilas((previo) => ({ ...previo, [id]: 'guardado' }));
+      }
+      if (revision) {
+        queryClient.invalidateQueries({ queryKey: ['respuestas-checklist-personas', revision.id], refetchType: 'none' });
+      }
+    } catch {
+      if (versionFila.current[id] === version) {
+        setEstadoFilas((previo) => ({ ...previo, [id]: 'error' }));
+      }
+    }
+  }
+
+  function alCambiarResultado(id: number, resultado: string) {
+    actualizarFila(id, { resultado });
+    const fila = filas.find((f) => f.id === id);
+    void guardarFilaAhora(id, { resultado, evidencia: fila?.evidencia ?? '' });
+  }
+
+  function alSalirDeEvidencia(id: number) {
+    const fila = filas.find((f) => f.id === id);
+    if (!fila) return;
+    void guardarFilaAhora(id, { resultado: fila.resultado, evidencia: fila.evidencia });
+  }
+
   async function guardar() {
     if (!revision) return;
     setGuardando(true);
     try {
+      // Red de seguridad: por si queda algún campo sin confirmar (ej. el usuario cerró con
+      // el cursor todavía en el textarea de evidencia, sin que se disparara el "blur").
       await Promise.all(
         filas.map((f) => actualizarRespuestaChecklistPersonas(f.id, { resultado: f.resultado, evidencia: f.evidencia })),
       );
-      message.success('Checklist guardado.');
+      // El checklist ya está completo (es la única forma de habilitar este botón) — al
+      // guardar queda finalizado: de solo lectura para cualquiera que no sea administrador.
+      await finalizarRevisionPersonas(revision.id, true);
       queryClient.invalidateQueries({ queryKey: ['respuestas-checklist-personas', revision.id] });
+      queryClient.invalidateQueries({ queryKey: ['revisiones-personas'] });
+      message.success('Checklist finalizado y guardado.');
       onClose();
     } catch {
       message.error('No se pudo guardar el checklist. Revisa los datos e intenta de nuevo.');
@@ -64,23 +116,75 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
   const respuestas = data?.results ?? [];
   const controlCodigo = respuestas[0]?.pregunta_control_codigo;
   const controlNombre = respuestas[0]?.pregunta_control_nombre;
+  const completo = filas.length > 0 && filas.every((f) => f.resultado !== '');
+  const finalizada = Boolean(revision?.finalizada);
+  const soloLectura = finalizada && !esAdministrador;
 
   return (
     <Modal
-      title={revision ? `Checklist — Revisión ${revision.fecha_revision}` : 'Checklist'}
+      title={
+        <span>
+          {revision ? `Checklist — Revisión ${revision.fecha_revision}` : 'Checklist'}
+          {finalizada && (
+            <Tag icon={<LockOutlined />} color={esAdministrador ? 'gold' : 'default'} style={{ marginLeft: 10 }}>
+              Finalizado
+            </Tag>
+          )}
+        </span>
+      }
       open={open}
       onCancel={onClose}
+      footer={
+        soloLectura
+          ? [
+              <Button key="cerrar" onClick={onClose}>
+                Cerrar
+              </Button>,
+            ]
+          : undefined
+      }
       onOk={guardar}
-      okText="Guardar"
+      okText="Guardar y cerrar"
+      okButtonProps={{ disabled: !completo }}
+      cancelText="Cerrar"
       confirmLoading={guardando}
       destroyOnHidden
-      width={900}
+      width={940}
     >
       {isLoading && <Skeleton active paragraph={{ rows: 6 }} />}
       {isError && <Alert type="error" message="No se pudo cargar el checklist." showIcon />}
 
       {!isLoading && !isError && respuestas.length > 0 && (
         <>
+          {soloLectura && (
+            <Alert
+              type="warning"
+              showIcon
+              icon={<LockOutlined />}
+              style={{ marginBottom: 12 }}
+              message="Este checklist ya fue finalizado y quedó de solo lectura. Solo un administrador puede modificarlo."
+            />
+          )}
+          {!soloLectura && finalizada && (
+            <Alert
+              type="warning"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message="Este checklist está finalizado. Como administrador puedes seguir editándolo si necesitas hacer un ajuste."
+            />
+          )}
+          {!finalizada && (
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message={
+                completo
+                  ? 'Checklist completo — al hacer clic en "Guardar y cerrar" quedará finalizado y de solo lectura.'
+                  : 'Cada respuesta se guarda automáticamente al diligenciarla — puedes cerrar en cualquier momento y continuar más tarde sin perder lo avanzado. El botón "Guardar y cerrar" se habilita cuando todas las preguntas tengan un resultado.'
+              }
+            />
+          )}
           <h3 style={{ color: BRAND.tealDark, marginTop: 0 }}>
             {controlCodigo} {controlNombre}
           </h3>
@@ -92,6 +196,7 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
                   <th style={celdaEncabezado({})}>Pregunta / criterio</th>
                   <th style={celdaEncabezado({ width: 160 })}>Resultado (C / CP / NC / NE)</th>
                   <th style={celdaEncabezado({ width: 220 })}>Evidencia / observación</th>
+                  <th style={celdaEncabezado({ width: 36 })} aria-label="Estado de guardado" />
                 </tr>
               </thead>
               <tbody>
@@ -105,18 +210,24 @@ export function ChecklistPersonasModal({ open, revision, onClose }: Props) {
                         <Select
                           allowClear
                           size="small"
+                          disabled={soloLectura}
                           style={{ width: '100%' }}
                           options={OPCIONES_RESULTADO}
                           value={fila?.resultado || undefined}
-                          onChange={(valor) => actualizarFila(r.id, { resultado: valor ?? '' })}
+                          onChange={(valor) => alCambiarResultado(r.id, valor ?? '')}
                         />
                       </td>
                       <td style={celdaCuerpo()}>
                         <Input.TextArea
                           autoSize={{ minRows: 1, maxRows: 4 }}
+                          disabled={soloLectura}
                           value={fila?.evidencia ?? ''}
                           onChange={(e) => actualizarFila(r.id, { evidencia: e.target.value })}
+                          onBlur={() => alSalirDeEvidencia(r.id)}
                         />
+                      </td>
+                      <td style={{ ...celdaCuerpo(), textAlign: 'center' }}>
+                        <IndicadorGuardado estado={estadoFilas[r.id]} />
                       </td>
                     </tr>
                   );
@@ -151,4 +262,29 @@ function celdaEncabezado(estiloExtra: React.CSSProperties): React.CSSProperties 
 
 function celdaCuerpo(): React.CSSProperties {
   return { padding: '8px 10px', border: '1px solid #d9d9d9', verticalAlign: 'top' };
+}
+
+function IndicadorGuardado({ estado }: { estado: EstadoGuardadoFila }) {
+  if (estado === 'guardando') {
+    return (
+      <Tooltip title="Guardando...">
+        <LoadingOutlined style={{ color: BRAND.tealDark }} />
+      </Tooltip>
+    );
+  }
+  if (estado === 'guardado') {
+    return (
+      <Tooltip title="Guardado">
+        <CheckCircleFilled style={{ color: '#52c41a' }} />
+      </Tooltip>
+    );
+  }
+  if (estado === 'error') {
+    return (
+      <Tooltip title="No se pudo guardar esta respuesta. Vuelve a intentarlo.">
+        <WarningFilled style={{ color: '#faad14' }} />
+      </Tooltip>
+    );
+  }
+  return null;
 }

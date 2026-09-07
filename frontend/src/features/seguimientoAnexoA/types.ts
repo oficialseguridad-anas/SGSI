@@ -8,6 +8,7 @@ export interface RevisionPersonas {
   responsable_tecnologia: number;
   responsable_tecnologia_nombre: string;
   muestra_seleccionada: string;
+  finalizada: boolean;
   creado_en: string;
   actualizado_en: string;
 }

@@ -1,4 +1,5 @@
 from rest_framework import mixins, viewsets
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
 
 from .models import PreguntaChecklistPersonas, RespuestaChecklistPersonas, RevisionPersonas
@@ -27,6 +28,16 @@ class RevisionPersonasViewSet(viewsets.ModelViewSet):
             for pregunta in PreguntaChecklistPersonas.objects.all()
         )
 
+    def perform_update(self, serializer):
+        # Cualquier usuario con el permiso puede finalizar el checklist (False -> True) al
+        # terminarlo, pero solo un administrador puede reabrirlo (True -> False) — evita que
+        # un usuario normal se "autodesbloquee" un checklist ya finalizado.
+        instance = serializer.instance
+        finalizada_nueva = serializer.validated_data.get('finalizada', instance.finalizada)
+        if instance.finalizada and not finalizada_nueva and not self.request.user.is_superuser:
+            raise PermissionDenied('Solo un administrador puede reabrir un checklist finalizado.')
+        serializer.save()
+
 
 class PreguntaChecklistPersonasViewSet(viewsets.ReadOnlyModelViewSet):
     """Catálogo de preguntas: se administra desde /admin/, de solo lectura en la API."""
@@ -46,3 +57,11 @@ class RespuestaChecklistPersonasViewSet(
     serializer_class = RespuestaChecklistPersonasSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
     filterset_fields = ['revision']
+
+    def perform_update(self, serializer):
+        # Una vez finalizado el checklist de la revisión, las respuestas quedan de solo
+        # lectura salvo para un administrador que necesite hacer un ajuste puntual.
+        revision = serializer.instance.revision
+        if revision.finalizada and not self.request.user.is_superuser:
+            raise PermissionDenied('Este checklist ya fue finalizado. Solo un administrador puede modificarlo.')
+        serializer.save()

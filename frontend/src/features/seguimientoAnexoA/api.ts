@@ -25,6 +25,11 @@ export async function eliminarRevisionPersonas(id: number) {
   await apiClient.delete(`/revisiones-personas/${id}/`);
 }
 
+export async function finalizarRevisionPersonas(id: number, finalizada: boolean) {
+  const { data } = await apiClient.patch<RevisionPersonas>(`/revisiones-personas/${id}/`, { finalizada });
+  return data;
+}
+
 export async function fetchRespuestasChecklistPersonas(revisionId: number) {
   const { data } = await apiClient.get<{ results: RespuestaChecklistPersonas[]; count: number }>(
     '/respuestas-checklist-personas/',
