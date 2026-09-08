@@ -23,7 +23,6 @@ export interface TratamientoRiesgo {
   id: number;
   riesgo: number;
   opcion: OpcionTratamiento;
-  descripcion: string;
   accion_mitigacion: string;
   recursos_necesarios: string;
   responsables: number[];
@@ -43,7 +42,6 @@ export interface TratamientoRiesgo {
 export interface TratamientoRiesgoInput {
   riesgo: number;
   opcion: OpcionTratamiento;
-  descripcion: string;
   accion_mitigacion: string;
   recursos_necesarios: string;
   responsables: number[];

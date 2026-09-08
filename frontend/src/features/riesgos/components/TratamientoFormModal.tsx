@@ -73,7 +73,6 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
     if (tratamiento) {
       form.setFieldsValue({
         opcion: tratamiento.opcion,
-        descripcion: tratamiento.descripcion,
         accion_mitigacion: tratamiento.accion_mitigacion,
         recursos_necesarios: tratamiento.recursos_necesarios,
         responsables: tratamiento.responsables,
@@ -151,9 +150,6 @@ export function TratamientoFormModal({ open, riesgo, tratamiento, onClose }: Pro
           rules={[{ required: true, message: 'Selecciona una opción' }]}
         >
           <Select options={OPCIONES_OPCION} />
-        </Form.Item>
-        <Form.Item name="descripcion" label="Descripción">
-          <Input.TextArea rows={2} />
         </Form.Item>
         <Form.Item name="accion_mitigacion" label="Acción de mitigación">
           <Input.TextArea rows={2} />

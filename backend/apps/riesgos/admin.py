@@ -85,11 +85,11 @@ class TratamientoRiesgoAdmin(admin.ModelAdmin):
     form = TratamientoRiesgoAdminForm
     list_display = ['riesgo', 'opcion', 'estado', 'lista_responsables', 'fecha_limite']
     list_filter = ['opcion']
-    search_fields = ['riesgo__codigo', 'descripcion']
+    search_fields = ['riesgo__codigo']
     autocomplete_fields = ['riesgo', 'responsables']
     readonly_fields = ['archivos_existentes', 'riesgo_residual', 'nivel_de_riesgo_residual_display', 'estado']
     fields = [
-        'riesgo', 'opcion', 'descripcion', 'accion_mitigacion', 'recursos_necesarios',
+        'riesgo', 'opcion', 'accion_mitigacion', 'recursos_necesarios',
         'responsables', 'fecha_limite', 'fecha_cierre', 'fecha_proximo_seguimiento',
         'evidencias_esperadas', 'archivos_existentes', 'archivos_nuevos',
         'probabilidad_residual', 'impacto_residual', 'riesgo_residual', 'nivel_de_riesgo_residual_display',

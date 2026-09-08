@@ -124,7 +124,6 @@ class TratamientoRiesgo(TimeStampedModel):
 
     riesgo = models.ForeignKey(Riesgo, on_delete=models.CASCADE, related_name='tratamientos', db_column='riesgoId')
     opcion = models.CharField(max_length=15, choices=Opcion.choices, verbose_name='Opción de tratamiento')
-    descripcion = models.TextField(blank=True)
     accion_mitigacion = models.TextField(
         blank=True, verbose_name='Acción de mitigación', db_column='accionMitigacion'
     )

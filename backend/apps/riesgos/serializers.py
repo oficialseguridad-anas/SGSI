@@ -25,7 +25,7 @@ class TratamientoRiesgoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TratamientoRiesgo
         fields = [
-            'id', 'riesgo', 'opcion', 'descripcion', 'accion_mitigacion', 'recursos_necesarios',
+            'id', 'riesgo', 'opcion', 'accion_mitigacion', 'recursos_necesarios',
             'responsables', 'responsables_nombres', 'fecha_limite', 'fecha_cierre', 'fecha_proximo_seguimiento',
             'evidencias_esperadas', 'archivos_adjuntos', 'probabilidad_residual', 'impacto_residual',
             'riesgo_residual', 'nivel_de_riesgo_residual', 'estado', 'creado_en', 'actualizado_en',
