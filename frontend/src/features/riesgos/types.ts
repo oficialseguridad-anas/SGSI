@@ -74,7 +74,6 @@ export interface Riesgo {
 }
 
 export interface RiesgoInput {
-  codigo: string;
   activos: number[];
   amenaza: number;
   descripcion: string;

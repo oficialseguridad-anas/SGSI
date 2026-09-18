@@ -1,16 +1,19 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { GestionarSeguimientoModal } from '../components/GestionarSeguimientoModal';
 import { HallazgoFormModal } from '../components/HallazgoFormModal';
 import { eliminarHallazgo, fetchHallazgos } from '../api';
 import { COLOR_ESTADO_HALLAZGO, NOMBRE_ESTADO_HALLAZGO, TEXTO_ESTADO_HALLAZGO } from '../estadoHallazgo';
 import { NOMBRE_TIPO_HALLAZGO } from '../tipoHallazgo';
-import type { Hallazgo } from '../types';
+import type { EstadoHallazgo, Hallazgo } from '../types';
+
+const ESTADOS_HALLAZGO: EstadoHallazgo[] = ['ABIERTA', 'EN_PROCESO', 'CERRADA'];
 
 // Mismo patrón que Objetivos/Indicadores: recorta el texto a N líneas y muestra el
 // contenido completo en un tooltip al pasar el mouse, en vez de romper el layout de la
@@ -27,6 +30,50 @@ function textoCompacto(texto: string, filas = 3, ancho = 220) {
   );
 }
 
+function fondoClaro(colorHex: string, alpha = 0.14) {
+  const r = parseInt(colorHex.slice(1, 3), 16);
+  const g = parseInt(colorHex.slice(3, 5), 16);
+  const b = parseInt(colorHex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function TarjetaKpi({
+  color,
+  valor,
+  etiqueta,
+  seleccionada,
+  onClick,
+}: {
+  color: string;
+  valor: number;
+  etiqueta: string;
+  seleccionada: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Card
+      size="small"
+      hoverable
+      onClick={onClick}
+      styles={{ body: { padding: '14px 16px' } }}
+      style={{
+        cursor: 'pointer',
+        background: fondoClaro(color, seleccionada ? 0.22 : 0.14),
+        borderColor: seleccionada ? color : undefined,
+        boxShadow: seleccionada ? `0 0 0 1px ${color}` : undefined,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+        <div style={{ width: 4, borderRadius: 2, background: color }} />
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, color: '#1a1a1a' }}>{valor}</div>
+          <div style={{ fontSize: 12.5, color: '#4a4944' }}>{etiqueta}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export function HallazgosPage() {
   const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
@@ -36,12 +83,14 @@ export function HallazgosPage() {
   const [seguimientoModalAbierto, setSeguimientoModalAbierto] = useState(false);
   const [hallazgoParaSeguimiento, setHallazgoParaSeguimiento] = useState<Hallazgo | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState<EstadoHallazgo | null>(null);
 
   const hallazgos = data?.results ?? [];
   const hallazgosFiltrados = useMemo(() => {
     const termino = normalizarTexto(busqueda.trim());
-    if (!termino) return hallazgos;
     return hallazgos.filter((h) => {
+      if (filtroEstado && h.estado !== filtroEstado) return false;
+      if (!termino) return true;
       const campos = [
         h.codigo,
         h.descripcion,
@@ -57,7 +106,19 @@ export function HallazgosPage() {
       ];
       return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
     });
-  }, [hallazgos, busqueda]);
+  }, [hallazgos, busqueda, filtroEstado]);
+
+  const resumenEstados = useMemo(() => {
+    const conteo: Record<EstadoHallazgo, number> = { ABIERTA: 0, EN_PROCESO: 0, CERRADA: 0 };
+    hallazgos.forEach((h) => {
+      conteo[h.estado] += 1;
+    });
+    return conteo;
+  }, [hallazgos]);
+
+  function alternarFiltroEstado(estado: EstadoHallazgo) {
+    setFiltroEstado((actual) => (actual === estado ? null : estado));
+  }
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarHallazgo,
@@ -236,7 +297,29 @@ export function HallazgosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los hallazgos" />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={8} md={6}>
+          <TarjetaKpi
+            color={BRAND.teal}
+            valor={hallazgos.length}
+            etiqueta="Total de hallazgos"
+            seleccionada={filtroEstado === null}
+            onClick={() => setFiltroEstado(null)}
+          />
+        </Col>
+        {ESTADOS_HALLAZGO.map((estado) => (
+          <Col key={estado} xs={12} sm={8} md={6}>
+            <TarjetaKpi
+              color={COLOR_ESTADO_HALLAZGO[estado]}
+              valor={resumenEstados[estado]}
+              etiqueta={NOMBRE_ESTADO_HALLAZGO[estado]}
+              seleccionada={filtroEstado === estado}
+              onClick={() => alternarFiltroEstado(estado)}
+            />
+          </Col>
+        ))}
+      </Row>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Input
           allowClear
           prefix={<SearchOutlined style={{ color: '#898781' }} />}
@@ -245,7 +328,17 @@ export function HallazgosPage() {
           onChange={(e) => setBusqueda(e.target.value)}
           style={{ maxWidth: 480 }}
         />
-        {busqueda && (
+        {filtroEstado && (
+          <Tag
+            closable
+            onClose={() => setFiltroEstado(null)}
+            color={COLOR_ESTADO_HALLAZGO[filtroEstado]}
+            style={{ color: TEXTO_ESTADO_HALLAZGO[filtroEstado], borderColor: 'transparent' }}
+          >
+            Filtrando por: {NOMBRE_ESTADO_HALLAZGO[filtroEstado]}
+          </Tag>
+        )}
+        {(busqueda || filtroEstado) && (
           <Typography.Text type="secondary">
             {hallazgosFiltrados.length} de {hallazgos.length} hallazgos
           </Typography.Text>
@@ -259,7 +352,8 @@ export function HallazgosPage() {
         pagination={false}
         scroll={{ x: 1950 }}
         locale={{
-          emptyText: busqueda ? <Empty description={`Ningún hallazgo coincide con "${busqueda}".`} /> : undefined,
+          emptyText:
+            busqueda || filtroEstado ? <Empty description="Ningún hallazgo coincide con el filtro aplicado." /> : undefined,
         }}
       />
       <HallazgoFormModal open={modalAbierto} hallazgo={hallazgoEditando} onClose={() => setModalAbierto(false)} />

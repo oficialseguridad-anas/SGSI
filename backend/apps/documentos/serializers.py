@@ -9,7 +9,7 @@ class VersionDocumentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = VersionDocumento
         fields = [
-            'id', 'documento', 'version', 'cambios', 'archivo', 'creado_por',
+            'id', 'documento', 'version', 'fecha_version', 'cambios', 'archivo', 'creado_por',
             'creado_por_nombre', 'creado_en',
         ]
         read_only_fields = ['id', 'creado_en']
@@ -25,7 +25,7 @@ class DocumentoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Documento
         fields = [
-            'id', 'codigo', 'titulo', 'tipo', 'descripcion', 'version_actual', 'estado',
+            'id', 'codigo', 'titulo', 'tipo', 'version_actual', 'estado',
             'propietario', 'propietario_nombre', 'aprobado_por', 'aprobado_por_nombre',
             'archivo', 'fecha_aprobacion', 'fecha_proxima_revision', 'versiones',
             'creado_en', 'actualizado_en',

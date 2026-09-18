@@ -16,10 +16,21 @@ export interface VersionDocumento {
   id: number;
   documento: number;
   version: string;
+  fecha_version: string;
   cambios: string;
   archivo: string | null;
+  creado_por: number | null;
   creado_por_nombre: string | null;
   creado_en: string;
+}
+
+export interface VersionDocumentoInput {
+  documento: number;
+  version: string;
+  fecha_version: string;
+  cambios: string;
+  creado_por: number | null;
+  archivo: File | null;
 }
 
 export interface Documento {
@@ -27,7 +38,6 @@ export interface Documento {
   codigo: string;
   titulo: string;
   tipo: TipoDocumento;
-  descripcion: string;
   version_actual: string;
   estado: EstadoDocumento;
   propietario: number;
@@ -44,7 +54,6 @@ export interface DocumentoInput {
   codigo: string;
   titulo: string;
   tipo: TipoDocumento;
-  descripcion: string;
   version_actual: string;
   estado: EstadoDocumento;
   propietario: number;

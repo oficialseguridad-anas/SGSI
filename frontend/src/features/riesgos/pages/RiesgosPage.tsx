@@ -1,9 +1,10 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { GestionarTratamientoModal } from '../components/GestionarTratamientoModal';
 import { MapaCalorRiesgosModal } from '../components/MapaCalorRiesgosModal';
@@ -14,14 +15,61 @@ import {
   COLOR_ESTADO_TRATAMIENTO,
   NOMBRE_ESTADO_TRATAMIENTO,
   TEXTO_ESTADO_TRATAMIENTO,
+  type EstadoTratamientoConSinTratar,
 } from '../estadoTratamiento';
 import { COLOR_NIVEL_RIESGO, NOMBRE_NIVEL_RIESGO, TEXTO_NIVEL_RIESGO } from '../nivelRiesgo';
 import type { Riesgo } from '../types';
+
+const ESTADOS_TRATAMIENTO: EstadoTratamientoConSinTratar[] = ['SIN_TRATAMIENTO', 'PENDIENTE', 'VENCIDO', 'COMPLETADO'];
 
 function ultimoTratamientoDe(riesgo: Riesgo) {
   return riesgo.tratamientos.reduce<Riesgo['tratamientos'][number] | null>(
     (mas_reciente, actual) => (!mas_reciente || actual.id > mas_reciente.id ? actual : mas_reciente),
     null,
+  );
+}
+
+function fondoClaro(colorHex: string, alpha = 0.14) {
+  const r = parseInt(colorHex.slice(1, 3), 16);
+  const g = parseInt(colorHex.slice(3, 5), 16);
+  const b = parseInt(colorHex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function TarjetaKpi({
+  color,
+  valor,
+  etiqueta,
+  seleccionada,
+  onClick,
+}: {
+  color: string;
+  valor: number;
+  etiqueta: string;
+  seleccionada: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Card
+      size="small"
+      hoverable
+      onClick={onClick}
+      styles={{ body: { padding: '14px 16px' } }}
+      style={{
+        cursor: 'pointer',
+        background: fondoClaro(color, seleccionada ? 0.22 : 0.14),
+        borderColor: seleccionada ? color : undefined,
+        boxShadow: seleccionada ? `0 0 0 1px ${color}` : undefined,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+        <div style={{ width: 4, borderRadius: 2, background: color }} />
+        <div>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, color: '#1a1a1a' }}>{valor}</div>
+          <div style={{ fontSize: 12.5, color: '#4a4944' }}>{etiqueta}</div>
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -39,12 +87,16 @@ export function RiesgosPage() {
     null,
   );
   const [busqueda, setBusqueda] = useState('');
+  const [filtroEstado, setFiltroEstado] = useState<EstadoTratamientoConSinTratar | null>(null);
 
   const riesgos = data?.results ?? [];
   const riesgosFiltrados = useMemo(() => {
     const termino = normalizarTexto(busqueda.trim());
-    if (!termino) return riesgos;
     return riesgos.filter((riesgo) => {
+      if (filtroEstado && (ultimoTratamientoDe(riesgo)?.estado ?? 'SIN_TRATAMIENTO') !== filtroEstado) {
+        return false;
+      }
+      if (!termino) return true;
       const campos = [
         riesgo.codigo,
         riesgo.amenaza_nombre,
@@ -54,7 +106,25 @@ export function RiesgosPage() {
       ];
       return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
     });
-  }, [riesgos, busqueda]);
+  }, [riesgos, busqueda, filtroEstado]);
+
+  function alternarFiltroEstado(estado: EstadoTratamientoConSinTratar) {
+    setFiltroEstado((actual) => (actual === estado ? null : estado));
+  }
+
+  const resumenEstados = useMemo(() => {
+    const conteo: Record<EstadoTratamientoConSinTratar, number> = {
+      SIN_TRATAMIENTO: 0,
+      PENDIENTE: 0,
+      VENCIDO: 0,
+      COMPLETADO: 0,
+    };
+    riesgos.forEach((riesgo) => {
+      const estado = ultimoTratamientoDe(riesgo)?.estado ?? 'SIN_TRATAMIENTO';
+      conteo[estado] += 1;
+    });
+    return conteo;
+  }, [riesgos]);
 
   function abrirPrevisualizacion(tratamiento: Riesgo['tratamientos'][number]) {
     setTratamientoParaPrevisualizar(tratamiento);
@@ -233,7 +303,29 @@ export function RiesgosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los riesgos" />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={8} md={4}>
+          <TarjetaKpi
+            color={BRAND.teal}
+            valor={riesgos.length}
+            etiqueta="Total de riesgos"
+            seleccionada={filtroEstado === null}
+            onClick={() => setFiltroEstado(null)}
+          />
+        </Col>
+        {ESTADOS_TRATAMIENTO.map((estado) => (
+          <Col key={estado} xs={12} sm={8} md={5}>
+            <TarjetaKpi
+              color={COLOR_ESTADO_TRATAMIENTO[estado]}
+              valor={resumenEstados[estado]}
+              etiqueta={NOMBRE_ESTADO_TRATAMIENTO[estado]}
+              seleccionada={filtroEstado === estado}
+              onClick={() => alternarFiltroEstado(estado)}
+            />
+          </Col>
+        ))}
+      </Row>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Input
           allowClear
           prefix={<SearchOutlined style={{ color: '#898781' }} />}
@@ -242,7 +334,17 @@ export function RiesgosPage() {
           onChange={(e) => setBusqueda(e.target.value)}
           style={{ maxWidth: 480 }}
         />
-        {busqueda && (
+        {filtroEstado && (
+          <Tag
+            closable
+            onClose={() => setFiltroEstado(null)}
+            color={COLOR_ESTADO_TRATAMIENTO[filtroEstado]}
+            style={{ color: TEXTO_ESTADO_TRATAMIENTO[filtroEstado], borderColor: 'transparent' }}
+          >
+            Filtrando por: {NOMBRE_ESTADO_TRATAMIENTO[filtroEstado]}
+          </Tag>
+        )}
+        {(busqueda || filtroEstado) && (
           <Typography.Text type="secondary">
             {riesgosFiltrados.length} de {riesgos.length} riesgos
           </Typography.Text>
@@ -256,7 +358,8 @@ export function RiesgosPage() {
         pagination={false}
         scroll={{ x: 1550 }}
         locale={{
-          emptyText: busqueda ? <Empty description={`Ningún riesgo coincide con "${busqueda}".`} /> : undefined,
+          emptyText:
+            busqueda || filtroEstado ? <Empty description="Ningún riesgo coincide con el filtro aplicado." /> : undefined,
         }}
       />
       <RiesgoFormModal open={modalAbierto} riesgo={riesgoEditando} onClose={() => setModalAbierto(false)} />

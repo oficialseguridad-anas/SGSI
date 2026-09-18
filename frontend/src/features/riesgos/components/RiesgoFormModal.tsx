@@ -49,7 +49,6 @@ export function RiesgoFormModal({ open, riesgo, onClose }: Props) {
     form.resetFields();
     if (riesgo) {
       form.setFieldsValue({
-        codigo: riesgo.codigo,
         activos: riesgo.activos,
         amenaza: riesgo.amenaza,
         descripcion: riesgo.descripcion,
@@ -101,9 +100,6 @@ export function RiesgoFormModal({ open, riesgo, onClose }: Props) {
       width={680}
     >
       <Form form={form} layout="vertical" onFinish={(values) => mutation.mutate(values)}>
-        <Form.Item name="codigo" label="Código" rules={[{ required: true, message: 'Ingresa un código' }]}>
-          <Input placeholder="R-001" />
-        </Form.Item>
         <Form.Item
           name="activos"
           label="Activos afectados"

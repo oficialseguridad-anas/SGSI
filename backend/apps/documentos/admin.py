@@ -13,12 +13,12 @@ class VersionDocumentoInline(admin.TabularInline):
 class DocumentoAdmin(admin.ModelAdmin):
     list_display = ['codigo', 'titulo', 'tipo', 'estado', 'version_actual', 'propietario']
     list_filter = ['tipo', 'estado']
-    search_fields = ['codigo', 'titulo', 'descripcion']
+    search_fields = ['codigo', 'titulo']
     autocomplete_fields = ['propietario', 'aprobado_por']
     inlines = [VersionDocumentoInline]
 
 
 @admin.register(VersionDocumento)
 class VersionDocumentoAdmin(admin.ModelAdmin):
-    list_display = ['documento', 'version', 'creado_por', 'creado_en']
+    list_display = ['documento', 'version', 'fecha_version', 'creado_por']
     autocomplete_fields = ['documento', 'creado_por']

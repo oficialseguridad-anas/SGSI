@@ -55,7 +55,9 @@ class RiesgoSerializer(serializers.ModelSerializer):
             'propietarios_riesgo', 'propietarios_nombres', 'controles', 'esta_activo',
             'fecha_identificacion', 'tratamientos', 'creado_en', 'actualizado_en',
         ]
-        read_only_fields = ['id', 'riesgo_inherente', 'fecha_identificacion', 'creado_en', 'actualizado_en']
+        read_only_fields = [
+            'id', 'codigo', 'riesgo_inherente', 'fecha_identificacion', 'creado_en', 'actualizado_en',
+        ]
 
     def get_activos_nombres(self, obj):
         return [f'{a.codigo} - {a.nombre}' for a in obj.activos.all()]

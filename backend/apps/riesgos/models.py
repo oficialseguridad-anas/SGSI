@@ -89,8 +89,22 @@ class Riesgo(TimeStampedModel):
         return self.codigo
 
     def save(self, *args, **kwargs):
+        if not self.codigo:
+            self.codigo = self._siguiente_codigo()
         self.riesgo_inherente = self.probabilidad * self.impacto
         super().save(*args, **kwargs)
+
+    @staticmethod
+    def _siguiente_codigo():
+        """Siguiente código secuencial (R-001, R-002, ...) según los ya existentes."""
+        max_num = 0
+        ancho = 3
+        for codigo in Riesgo.objects.values_list('codigo', flat=True):
+            numero = codigo.rsplit('-', 1)[-1]
+            if numero.isdigit():
+                max_num = max(max_num, int(numero))
+                ancho = max(ancho, len(numero))
+        return f'R-{str(max_num + 1).zfill(ancho)}'
 
     # Matriz de riesgo (probabilidad, impacto) -> nivel, tal como está definida en la
     # matriz de referencia de la entidad. No es un simple umbral sobre el producto:
