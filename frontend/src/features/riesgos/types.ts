@@ -60,6 +60,7 @@ export interface Riesgo {
   activos_nombres: string[];
   amenaza: number;
   amenaza_nombre: string;
+  amenaza_descripcion: string;
   descripcion: string;
   probabilidad: number;
   impacto: number;

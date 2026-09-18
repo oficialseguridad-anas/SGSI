@@ -1,6 +1,6 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Tooltip, Typography, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
@@ -17,10 +17,19 @@ import {
   TEXTO_ESTADO_TRATAMIENTO,
   type EstadoTratamientoConSinTratar,
 } from '../estadoTratamiento';
-import { COLOR_NIVEL_RIESGO, NOMBRE_NIVEL_RIESGO, TEXTO_NIVEL_RIESGO } from '../nivelRiesgo';
+import { COLOR_NIVEL_RIESGO, NOMBRE_NIVEL_RIESGO, TEXTO_NIVEL_RIESGO, type NivelDeRiesgo } from '../nivelRiesgo';
 import type { Riesgo } from '../types';
 
 const ESTADOS_TRATAMIENTO: EstadoTratamientoConSinTratar[] = ['SIN_TRATAMIENTO', 'PENDIENTE', 'VENCIDO', 'COMPLETADO'];
+const NIVELES_RIESGO: NivelDeRiesgo[] = ['CRITICO', 'ALTO', 'MEDIO', 'BAJO'];
+
+function desgloseNivelDe(riesgos: Riesgo[]): Record<NivelDeRiesgo, number> {
+  const conteo: Record<NivelDeRiesgo, number> = { BAJO: 0, MEDIO: 0, ALTO: 0, CRITICO: 0 };
+  riesgos.forEach((riesgo) => {
+    conteo[riesgo.nivel_de_riesgo] += 1;
+  });
+  return conteo;
+}
 
 function ultimoTratamientoDe(riesgo: Riesgo) {
   return riesgo.tratamientos.reduce<Riesgo['tratamientos'][number] | null>(
@@ -42,31 +51,55 @@ function TarjetaKpi({
   etiqueta,
   seleccionada,
   onClick,
+  desglose,
 }: {
   color: string;
   valor: number;
   etiqueta: string;
   seleccionada: boolean;
   onClick: () => void;
+  desglose?: Record<NivelDeRiesgo, number>;
 }) {
   return (
     <Card
       size="small"
       hoverable
       onClick={onClick}
-      styles={{ body: { padding: '14px 16px' } }}
+      styles={{ body: { padding: '14px 16px', height: '100%' } }}
       style={{
         cursor: 'pointer',
+        height: '100%',
         background: fondoClaro(color, seleccionada ? 0.22 : 0.14),
         borderColor: seleccionada ? color : undefined,
         boxShadow: seleccionada ? `0 0 0 1px ${color}` : undefined,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12, height: '100%' }}>
         <div style={{ width: 4, borderRadius: 2, background: color }} />
-        <div>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, color: '#1a1a1a' }}>{valor}</div>
           <div style={{ fontSize: 12.5, color: '#4a4944' }}>{etiqueta}</div>
+          {desglose && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap', minHeight: 16 }}>
+              {NIVELES_RIESGO.filter((nivel) => desglose[nivel] > 0).map((nivel) => (
+                <span
+                  key={nivel}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: COLOR_NIVEL_RIESGO[nivel],
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span style={{ color: '#65645f' }}>{NOMBRE_NIVEL_RIESGO[nivel]} {desglose[nivel]}</span>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </Card>
@@ -112,18 +145,23 @@ export function RiesgosPage() {
     setFiltroEstado((actual) => (actual === estado ? null : estado));
   }
 
+  const desgloseTotal = useMemo(() => desgloseNivelDe(riesgos), [riesgos]);
+
   const resumenEstados = useMemo(() => {
-    const conteo: Record<EstadoTratamientoConSinTratar, number> = {
-      SIN_TRATAMIENTO: 0,
-      PENDIENTE: 0,
-      VENCIDO: 0,
-      COMPLETADO: 0,
+    const grupos: Record<EstadoTratamientoConSinTratar, Riesgo[]> = {
+      SIN_TRATAMIENTO: [],
+      PENDIENTE: [],
+      VENCIDO: [],
+      COMPLETADO: [],
     };
     riesgos.forEach((riesgo) => {
       const estado = ultimoTratamientoDe(riesgo)?.estado ?? 'SIN_TRATAMIENTO';
-      conteo[estado] += 1;
+      grupos[estado].push(riesgo);
     });
-    return conteo;
+    return ESTADOS_TRATAMIENTO.reduce(
+      (acc, estado) => ({ ...acc, [estado]: { total: grupos[estado].length, desglose: desgloseNivelDe(grupos[estado]) } }),
+      {} as Record<EstadoTratamientoConSinTratar, { total: number; desglose: Record<NivelDeRiesgo, number> }>,
+    );
   }, [riesgos]);
 
   function abrirPrevisualizacion(tratamiento: Riesgo['tratamientos'][number]) {
@@ -172,7 +210,15 @@ export function RiesgosPage() {
       width: 220,
       render: (nombres: string[]) => nombres.join(', '),
     },
-    { title: 'Amenaza', dataIndex: 'amenaza_nombre', key: 'amenaza_nombre', width: 160 },
+    {
+      title: 'Amenaza',
+      dataIndex: 'amenaza_nombre',
+      key: 'amenaza_nombre',
+      width: 160,
+      render: (nombre: string, riesgo: Riesgo) => (
+        <Tooltip title={riesgo.amenaza_descripcion || nombre}>{nombre}</Tooltip>
+      ),
+    },
     {
       title: 'Nivel de riesgo',
       dataIndex: 'nivel_de_riesgo',
@@ -303,7 +349,7 @@ export function RiesgosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los riesgos" />
-      <Row gutter={[12, 12]} style={{ marginBottom: 16 }}>
+      <Row gutter={[12, 12]} align="stretch" style={{ marginBottom: 16 }}>
         <Col xs={12} sm={8} md={4}>
           <TarjetaKpi
             color={BRAND.teal}
@@ -311,16 +357,18 @@ export function RiesgosPage() {
             etiqueta="Total de riesgos"
             seleccionada={filtroEstado === null}
             onClick={() => setFiltroEstado(null)}
+            desglose={desgloseTotal}
           />
         </Col>
         {ESTADOS_TRATAMIENTO.map((estado) => (
           <Col key={estado} xs={12} sm={8} md={5}>
             <TarjetaKpi
               color={COLOR_ESTADO_TRATAMIENTO[estado]}
-              valor={resumenEstados[estado]}
+              valor={resumenEstados[estado].total}
               etiqueta={NOMBRE_ESTADO_TRATAMIENTO[estado]}
               seleccionada={filtroEstado === estado}
               onClick={() => alternarFiltroEstado(estado)}
+              desglose={resumenEstados[estado].desglose}
             />
           </Col>
         ))}

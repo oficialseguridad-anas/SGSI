@@ -43,6 +43,7 @@ class TratamientoRiesgoSerializer(serializers.ModelSerializer):
 class RiesgoSerializer(serializers.ModelSerializer):
     activos_nombres = serializers.SerializerMethodField()
     amenaza_nombre = serializers.CharField(source='amenaza.nombre', read_only=True)
+    amenaza_descripcion = serializers.CharField(source='amenaza.descripcion', read_only=True)
     propietarios_nombres = serializers.SerializerMethodField()
     nivel_de_riesgo = serializers.CharField(read_only=True)
     tratamientos = TratamientoRiesgoSerializer(many=True, read_only=True)
@@ -50,7 +51,7 @@ class RiesgoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Riesgo
         fields = [
-            'id', 'codigo', 'activos', 'activos_nombres', 'amenaza', 'amenaza_nombre',
+            'id', 'codigo', 'activos', 'activos_nombres', 'amenaza', 'amenaza_nombre', 'amenaza_descripcion',
             'descripcion', 'probabilidad', 'impacto', 'riesgo_inherente', 'nivel_de_riesgo',
             'propietarios_riesgo', 'propietarios_nombres', 'controles', 'esta_activo',
             'fecha_identificacion', 'tratamientos', 'creado_en', 'actualizado_en',

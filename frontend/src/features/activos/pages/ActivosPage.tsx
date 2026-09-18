@@ -1,13 +1,97 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Empty, Input, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
+import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { ActivoFormModal } from '../components/ActivoFormModal';
 import { eliminarActivo, fetchActivos } from '../api';
 import type { Activo, ClaseActivo, EstadoActivo, EtiquetadoActivo, NivelValoracion, TipoActivo } from '../types';
+
+// Misma paleta categórica que GraficaHallazgosPorProceso — orden fijo, reasignada de
+// forma determinista según el conteo descendente de cada carga (el proceso no es un
+// enum fijo, es un catálogo dinámico que crece con cada organización).
+const PALETA_PROCESO = [
+  '#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7',
+];
+const SIN_PROCESO_COLOR = '#65645f';
+
+function fondoClaro(colorHex: string, alpha = 0.14) {
+  const r = parseInt(colorHex.slice(1, 3), 16);
+  const g = parseInt(colorHex.slice(3, 5), 16);
+  const b = parseInt(colorHex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+const NIVELES_CRITICIDAD: NivelValoracion[] = ['ALTA', 'MEDIA', 'BAJA'];
+const HEX_CRITICIDAD: Record<NivelValoracion, string> = {
+  ALTA: '#e34948',
+  MEDIA: '#eda100',
+  BAJA: '#008300',
+};
+
+function TarjetaKpi({
+  color,
+  valor,
+  etiqueta,
+  seleccionada,
+  onClick,
+  desglose,
+}: {
+  color: string;
+  valor: number;
+  etiqueta: string;
+  seleccionada: boolean;
+  onClick: () => void;
+  desglose?: Record<NivelValoracion, number>;
+}) {
+  return (
+    <Card
+      size="small"
+      hoverable
+      onClick={onClick}
+      styles={{ body: { padding: '14px 16px', height: '100%' } }}
+      style={{
+        cursor: 'pointer',
+        height: '100%',
+        background: fondoClaro(color, seleccionada ? 0.22 : 0.14),
+        borderColor: seleccionada ? color : undefined,
+        boxShadow: seleccionada ? `0 0 0 1px ${color}` : undefined,
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12, height: '100%' }}>
+        <div style={{ width: 4, borderRadius: 2, background: color }} />
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.15, color: '#1a1a1a' }}>{valor}</div>
+          <div style={{ fontSize: 12.5, color: '#4a4944' }}>{etiqueta}</div>
+          {desglose && (
+            <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap', minHeight: 16 }}>
+              {NIVELES_CRITICIDAD.filter((nivel) => desglose[nivel] > 0).map((nivel) => (
+                <span
+                  key={nivel}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600 }}
+                >
+                  <span
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: HEX_CRITICIDAD[nivel],
+                      display: 'inline-block',
+                    }}
+                  />
+                  <span style={{ color: '#65645f' }}>{NOMBRE_CRITICIDAD[nivel]} {desglose[nivel]}</span>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
 
 const NOMBRE_CLASE: Record<ClaseActivo, string> = {
   SISTEMAS_INFORMACION: 'Sistemas de Información',
@@ -57,6 +141,9 @@ export function ActivosPage() {
   const [modalAbierto, setModalAbierto] = useState(false);
   const [activoEditando, setActivoEditando] = useState<Activo | null>(null);
   const [busqueda, setBusqueda] = useState('');
+  // undefined = sin filtro (tarjeta "Total"); null = tarjeta "Sin proceso asignado";
+  // string = nombre de un proceso puntual.
+  const [filtroProceso, setFiltroProceso] = useState<string | null | undefined>(undefined);
 
   // Filtro instantáneo en el cliente — mismo criterio que en Documentos: el listado
   // completo ya viaja en un solo request, así que filtrar localmente responde al
@@ -64,8 +151,9 @@ export function ActivosPage() {
   const activos = data?.results ?? [];
   const activosFiltrados = useMemo(() => {
     const termino = normalizarTexto(busqueda.trim());
-    if (!termino) return activos;
     return activos.filter((activo) => {
+      if (filtroProceso !== undefined && activo.proceso_nombre !== filtroProceso) return false;
+      if (!termino) return true;
       const campos = [
         activo.codigo,
         activo.nombre,
@@ -79,7 +167,38 @@ export function ActivosPage() {
       ];
       return campos.some((campo) => campo && normalizarTexto(campo).includes(termino));
     });
-  }, [activos, busqueda]);
+  }, [activos, busqueda, filtroProceso]);
+
+  function desgloseCriticidadDe(lista: Activo[]): Record<NivelValoracion, number> {
+    const conteo: Record<NivelValoracion, number> = { ALTA: 0, MEDIA: 0, BAJA: 0 };
+    lista.forEach((activo) => {
+      conteo[activo.criticidad] += 1;
+    });
+    return conteo;
+  }
+
+  const desgloseTotal = useMemo(() => desgloseCriticidadDe(activos), [activos]);
+
+  const resumenProcesos = useMemo(() => {
+    const grupos = new Map<string | null, Activo[]>();
+    activos.forEach((activo) => {
+      const grupo = grupos.get(activo.proceso_nombre) ?? [];
+      grupo.push(activo);
+      grupos.set(activo.proceso_nombre, grupo);
+    });
+    return [...grupos.entries()]
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([nombre, lista], indice) => ({
+        nombre,
+        total: lista.length,
+        color: nombre === null ? SIN_PROCESO_COLOR : PALETA_PROCESO[indice % PALETA_PROCESO.length],
+        desglose: desgloseCriticidadDe(lista),
+      }));
+  }, [activos]);
+
+  function alternarFiltroProceso(nombre: string | null) {
+    setFiltroProceso((actual) => (actual === nombre ? undefined : nombre));
+  }
 
   const eliminarMutation = useMutation({
     mutationFn: eliminarActivo,
@@ -199,7 +318,31 @@ export function ActivosPage() {
       }
     >
       <ErrorCarga visible={isError} entidad="los activos" />
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+      <Row gutter={[12, 12]} align="stretch" style={{ marginBottom: 16 }}>
+        <Col xs={12} sm={8} md={4}>
+          <TarjetaKpi
+            color={BRAND.teal}
+            valor={activos.length}
+            etiqueta="Total de activos"
+            seleccionada={filtroProceso === undefined}
+            onClick={() => setFiltroProceso(undefined)}
+            desglose={desgloseTotal}
+          />
+        </Col>
+        {resumenProcesos.map((proceso) => (
+          <Col key={proceso.nombre ?? '__sin_proceso__'} xs={12} sm={8} md={4}>
+            <TarjetaKpi
+              color={proceso.color}
+              valor={proceso.total}
+              etiqueta={proceso.nombre ?? 'Sin proceso asignado'}
+              seleccionada={filtroProceso === proceso.nombre}
+              onClick={() => alternarFiltroProceso(proceso.nombre)}
+              desglose={proceso.desglose}
+            />
+          </Col>
+        ))}
+      </Row>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Input
           allowClear
           prefix={<SearchOutlined style={{ color: '#898781' }} />}
@@ -208,7 +351,17 @@ export function ActivosPage() {
           onChange={(e) => setBusqueda(e.target.value)}
           style={{ maxWidth: 480 }}
         />
-        {busqueda && (
+        {filtroProceso !== undefined && (
+          <Tag
+            closable
+            onClose={() => setFiltroProceso(undefined)}
+            color={resumenProcesos.find((p) => p.nombre === filtroProceso)?.color ?? SIN_PROCESO_COLOR}
+            style={{ borderColor: 'transparent' }}
+          >
+            Filtrando por: {filtroProceso ?? 'Sin proceso asignado'}
+          </Tag>
+        )}
+        {(busqueda || filtroProceso !== undefined) && (
           <Typography.Text type="secondary">
             {activosFiltrados.length} de {activos.length} activos
           </Typography.Text>
@@ -222,7 +375,10 @@ export function ActivosPage() {
         pagination={{ pageSize: 20, showSizeChanger: true, showTotal: (total) => `${total} activos` }}
         scroll={{ x: 1450 }}
         locale={{
-          emptyText: busqueda ? <Empty description={`Ningún activo coincide con "${busqueda}".`} /> : undefined,
+          emptyText:
+            busqueda || filtroProceso !== undefined ? (
+              <Empty description="Ningún activo coincide con el filtro aplicado." />
+            ) : undefined,
         }}
       />
       <ActivoFormModal open={modalAbierto} activo={activoEditando} onClose={() => setModalAbierto(false)} />
