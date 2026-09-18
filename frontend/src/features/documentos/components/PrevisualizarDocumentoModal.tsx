@@ -1,6 +1,7 @@
 import { DownloadOutlined, FileOutlined } from '@ant-design/icons';
-import { Alert, Button, Empty, Modal, Skeleton } from 'antd';
+import { Alert, Button, Empty, Modal, Skeleton, Tabs } from 'antd';
 import { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { descargarArchivo, nombreDeArchivo, obtenerUrlPrevisualizacion } from '../../../shared/api/descargarArchivo';
 
 interface Props {
@@ -11,12 +12,18 @@ interface Props {
   onClose: () => void;
 }
 
-type Tipo = 'pdf' | 'imagen' | 'texto' | 'otro';
+type Tipo = 'pdf' | 'imagen' | 'excel' | 'texto' | 'otro';
+
+interface HojaExcel {
+  nombre: string;
+  html: string;
+}
 
 function tipoDeArchivo(nombre: string): Tipo {
   const extension = nombre.split('.').pop()?.toLowerCase() ?? '';
   if (extension === 'pdf') return 'pdf';
   if (['png', 'jpg', 'jpeg'].includes(extension)) return 'imagen';
+  if (['xlsx', 'xls', 'xlsm'].includes(extension)) return 'excel';
   if (['txt', 'csv'].includes(extension)) return 'texto';
   return 'otro';
 }
@@ -26,6 +33,8 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
   const [error, setError] = useState<string | null>(null);
   const [urlPrevia, setUrlPrevia] = useState<string | null>(null);
   const [textoPlano, setTextoPlano] = useState<string | null>(null);
+  const [hojasExcel, setHojasExcel] = useState<HojaExcel[] | null>(null);
+  const [hojaActiva, setHojaActiva] = useState<string>('');
 
   useEffect(() => {
     if (!open || !documentoId || !archivo) return;
@@ -38,6 +47,8 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
       setError(null);
       setUrlPrevia(null);
       setTextoPlano(null);
+      setHojasExcel(null);
+      setHojaActiva('');
       try {
         const ruta = `/documentos/${documentoId}/descargar/`;
         const { url, tipo: mime } = await obtenerUrlPrevisualizacion(ruta);
@@ -50,6 +61,17 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
         if (tipo === 'texto') {
           const respuesta = await fetch(url);
           setTextoPlano(await respuesta.text());
+        } else if (tipo === 'excel') {
+          const buffer = await (await fetch(url)).arrayBuffer();
+          const libro = XLSX.read(buffer, { type: 'array' });
+          const hojas = libro.SheetNames.map((nombreHoja) => ({
+            nombre: nombreHoja,
+            html: XLSX.utils.sheet_to_html(libro.Sheets[nombreHoja]),
+          }));
+          if (!cancelado) {
+            setHojasExcel(hojas);
+            setHojaActiva(hojas[0]?.nombre ?? '');
+          }
         } else {
           setUrlPrevia(url);
         }
@@ -96,6 +118,33 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
                   alt={nombre}
                   style={{ maxWidth: '100%', maxHeight: 560, display: 'block', margin: '0 auto' }}
                 />
+              )}
+              {tipo === 'excel' && hojasExcel && (
+                <div>
+                  {hojasExcel.length > 1 && (
+                    <Tabs
+                      size="small"
+                      activeKey={hojaActiva}
+                      onChange={setHojaActiva}
+                      items={hojasExcel.map((hoja) => ({ key: hoja.nombre, label: hoja.nombre }))}
+                    />
+                  )}
+                  <div
+                    className="previsualizar-excel"
+                    style={{
+                      maxHeight: 560,
+                      overflow: 'auto',
+                      border: '1px solid #e1e0d9',
+                      borderRadius: 4,
+                      padding: 8,
+                    }}
+                    // El HTML viene de XLSX.utils.sheet_to_html a partir del propio archivo
+                    // que el usuario acaba de subir/descargar — no de entrada de terceros.
+                    dangerouslySetInnerHTML={{
+                      __html: hojasExcel.find((hoja) => hoja.nombre === hojaActiva)?.html ?? hojasExcel[0].html,
+                    }}
+                  />
+                </div>
               )}
               {tipo === 'texto' && textoPlano !== null && (
                 <pre

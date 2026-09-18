@@ -73,6 +73,23 @@ body {
   }
 }
 
+.previsualizar-excel table {
+  border-collapse: collapse;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.previsualizar-excel td,
+.previsualizar-excel th {
+  border: 1px solid #e1e0d9;
+  padding: 4px 8px;
+}
+
+.previsualizar-excel tr:first-child td {
+  background: #f4f7f6;
+  font-weight: 600;
+}
+
 .login-brand-panel {
   display: flex;
 }

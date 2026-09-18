@@ -104,6 +104,22 @@ export function ControlesPage() {
     );
   }
 
+  // A diferencia de celdaTexto (una sola línea con "..."), esta variante envuelve el
+  // texto en varias líneas para aprovechar el ancho y el alto disponibles de la celda,
+  // y solo recorta con tooltip si de verdad no alcanza el espacio (mismo patrón que
+  // textoCompacto en HallazgosPage).
+  function celdaTextoAjustado(texto: string, ancho: number, filas = 4) {
+    if (!texto) return '—';
+    return (
+      <Typography.Paragraph
+        ellipsis={{ rows: filas, tooltip: { title: texto, placement: 'topLeft' } }}
+        style={{ marginBottom: 0, maxWidth: ancho }}
+      >
+        {texto}
+      </Typography.Paragraph>
+    );
+  }
+
   function columnaConEncabezado<T>(
     dataIndex: string,
     render: (valor: T, aplicabilidad: AplicabilidadControl) => React.ReactNode,
@@ -180,8 +196,8 @@ export function ControlesPage() {
     {
       title: 'Observaciones',
       key: 'observaciones',
-      width: 220,
-      ...columnaConEncabezado('observaciones', (texto: string) => celdaTexto(texto, 220), 7),
+      width: 260,
+      ...columnaConEncabezado('observaciones', (texto: string) => celdaTextoAjustado(texto, 260), 7),
     },
     {
       title: 'Acciones',
@@ -220,7 +236,7 @@ export function ControlesPage() {
         columns={columns}
         dataSource={filas}
         pagination={false}
-        scroll={{ x: 1450 }}
+        scroll={{ x: 1490 }}
         locale={{
           emptyText: busqueda ? <Empty description={`Ningún control coincide con "${busqueda}".`} /> : undefined,
         }}

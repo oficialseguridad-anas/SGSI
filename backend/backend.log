@@ -1,0 +1,49 @@
+INFO:waitress:Serving on http://0.0.0.0:8000
+Unauthorized: /api/v1/auth/token/refresh/
+WARNING:django.request:Unauthorized: /api/v1/auth/token/refresh/
+Unauthorized: /api/v1/riesgos/
+WARNING:django.request:Unauthorized: /api/v1/riesgos/
+Unauthorized: /api/v1/auth/token/refresh/
+WARNING:django.request:Unauthorized: /api/v1/auth/token/refresh/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/riesgos/
+WARNING:django.request:Unauthorized: /api/v1/riesgos/
+Unauthorized: /api/v1/archivos-adjuntos-tratamiento/21/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-tratamiento/21/descargar/
+Unauthorized: /api/v1/documentos/
+WARNING:django.request:Unauthorized: /api/v1/documentos/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/archivos-adjuntos-seguimiento/5/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-seguimiento/5/descargar/
+Unauthorized: /api/v1/archivos-adjuntos-seguimiento/6/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-seguimiento/6/descargar/
+Unauthorized: /api/v1/archivos-adjuntos-seguimiento/9/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-seguimiento/9/descargar/
+Unauthorized: /api/v1/archivos-adjuntos-seguimiento/10/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-seguimiento/10/descargar/
+Unauthorized: /api/v1/archivos-adjuntos-seguimiento/3/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-seguimiento/3/descargar/
+Unauthorized: /api/v1/archivos-adjuntos-seguimiento/16/descargar/
+WARNING:django.request:Unauthorized: /api/v1/archivos-adjuntos-seguimiento/16/descargar/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/usuarios/
+WARNING:django.request:Unauthorized: /api/v1/usuarios/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/indicadores/
+WARNING:django.request:Unauthorized: /api/v1/indicadores/
+Unauthorized: /api/v1/soa/
+WARNING:django.request:Unauthorized: /api/v1/soa/
+Unauthorized: /api/v1/indicadores/
+WARNING:django.request:Unauthorized: /api/v1/indicadores/
+Unauthorized: /api/v1/incidentes/
+WARNING:django.request:Unauthorized: /api/v1/incidentes/

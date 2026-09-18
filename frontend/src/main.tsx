@@ -27,7 +27,7 @@ createRoot(document.getElementById('root')!).render(
         components: {
           Layout: {
             siderBg: BRAND.tealDark,
-            headerBg: '#ffffff',
+            headerBg: BRAND.tealDark,
             bodyBg: BRAND.bg,
           },
           Menu: {

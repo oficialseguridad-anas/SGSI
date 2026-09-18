@@ -20,7 +20,7 @@ import { Avatar, Button, Dropdown, Layout, Menu, type MenuProps } from 'antd';
 import { useMemo, useState, type SyntheticEvent } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/AuthContext';
-import { LOGO_SRC } from '../theme/brand';
+import { BRAND, LOGO_SRC } from '../theme/brand';
 
 function ocultarSiFallaLogo(evento: SyntheticEvent<HTMLImageElement>) {
   evento.currentTarget.style.display = 'none';
@@ -171,17 +171,21 @@ export function Shell() {
       <Layout>
         <Header
           style={{
-            background: '#fff',
+            background: BRAND.tealDark,
             padding: '0 12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 10,
           }}
         >
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed((prev) => !prev)}
+            style={{ color: '#fff' }}
           />
           <Dropdown
             menu={{
@@ -200,7 +204,7 @@ export function Shell() {
               },
             }}
           >
-            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, color: '#fff' }}>
               <Avatar size="small">{user?.nombre_completo?.charAt(0).toUpperCase() ?? '?'}</Avatar>
               <span>{user?.nombre_completo ?? user?.email}</span>
             </div>
