@@ -6,7 +6,8 @@ actualizado en cada sesión** — al terminar cambios relevantes (nuevo módulo,
 decisión de diseño, cambio de flujo, pendiente nuevo), reflejarlos aquí.
 
 Última actualización: 2026-09-21 (agregado módulo de Revisiones semestrales de
-Activos y descarga de reporte Excel filtrable de Activos).
+Activos, descarga de reporte Excel filtrable de Activos, y checklists de
+Seguimiento Anexo A para Organizacionales/Físicos/Tecnológicos).
 
 ## 1. Qué es esto
 
@@ -178,6 +179,66 @@ Stop-Process -Id <ese_numero> -Force
   Nombre, Proceso, Dirección, Tipo, Clase, Naturaleza, Propietario, Custodio,
   Etiquetado, ¿Datos personales?, Confidencialidad, Integridad,
   Disponibilidad, Puntaje, Criticidad, Estado, Fecha de baja.
+
+### Seguimiento Anexo A — Checklists de Organizacionales, Físicos y Tecnológicos
+- Ya existía el checklist de **Personas** (A.6.1-A.6.8), hecho a mano con sus
+  propios modelos/componentes (2 responsables: Talento Humano + Tecnología).
+  Para los 3 grupos restantes (Organizacionales A.5.1-A.5.37, Físicos
+  A.7.1-A.7.14, Tecnológicos A.8.1-A.8.34) se construyó **infraestructura
+  genérica compartida** en vez de triplicar el código de Personas — Personas
+  se dejó intacta, sin tocar.
+- Backend (`backend/apps/revisiones/models.py`): clases abstractas
+  `RevisionAnexoABase`, `PreguntaChecklistAnexoABase`,
+  `RespuestaChecklistAnexoABase` con la lógica común (cálculo de
+  `porcentaje_general`/`porcentajes_por_control`, escala de resultado
+  C/CP/NC/NE con su puntaje). Cada categoría nueva tiene sus propios modelos
+  concretos (`RevisionOrganizacionales`, `PreguntaChecklistFisicos`,
+  `RespuestaChecklistTecnologicos`, etc. — 9 modelos en total) con un único
+  campo `responsable` (a diferencia de Personas que tiene 2), cuya
+  `verbose_name` cambia por categoría ("Responsable de Gestión de Procesos" /
+  "Responsable de Infraestructura y Recursos Físicos" / "Responsable de
+  Tecnología"). Las vistas (`views.py`) comparten mixins
+  (`RevisionAnexoAViewSetMixin`, `RespuestaChecklistAnexoAViewSetMixin`) para
+  no repetir 3 veces la lógica de "crear respuestas en blanco al crear la
+  revisión" y "solo un admin puede reabrir un checklist finalizado".
+- **Bug real detectado y corregido durante la construcción**: ordenar los
+  controles por `control_codigo` como texto (ej. para agrupar el checklist)
+  pone "A.5.10" antes que "A.5.2" (orden alfabético), algo que nunca se notó
+  con Personas porque A.6 solo llega hasta A.6.8. Se agregó un campo
+  `control_orden` (entero, calculado en `save()` a partir del número tras el
+  último punto de `control_codigo`) a `PreguntaChecklistAnexoABase`, con
+  backfill para las preguntas ya sembradas (migración
+  `0016_alter_preguntachecklistfisicos_options_and_more`). **Si se agrega un
+  cuarto grupo con este mismo patrón, no reintroducir el bug: ordenar por
+  `control_orden`, nunca por `control_codigo` como texto.**
+- Las preguntas de cada control (catálogo completo de los 85 controles
+  restantes del Anexo A, ~198 preguntas) se sembraron con migraciones de
+  datos: `0013_seed_preguntas_organizacionales.py`,
+  `0014_seed_preguntas_fisicos.py`, `0015_seed_preguntas_tecnologicos.py` —
+  cada una con TODOS los controles de su categoría en un solo archivo (a
+  diferencia de Personas, que tiene una migración por control porque se fue
+  construyendo incrementalmente en sesiones distintas).
+- Frontend (`frontend/src/features/seguimientoAnexoA/`): tipos genéricos
+  `RevisionAnexoA`/`PreguntaChecklistAnexoA`/`RespuestaChecklistAnexoA` en
+  `types.ts` (reutilizables por las 3 categorías, porque comparten la misma
+  forma); fábrica `crearApiRevisionAnexoA(prefijo)` en `api.ts` que genera las
+  6 funciones de API a partir del prefijo de la categoría (`apiOrganizacionales`,
+  `apiFisicos`, `apiTecnologicos`); `configCategorias.ts` con un objeto de
+  configuración por categoría (título, rango de controles, etiqueta del
+  responsable, funciones de API, query keys, nombre del modelo para permisos).
+  Dos componentes genéricos nuevos —`RevisionAnexoAFormModal.tsx` y
+  `ChecklistAnexoAModal.tsx`— reciben esa configuración por props y son usados
+  por las 3 categorías; `SeguimientoCategoriaPage.tsx` (antes un placeholder
+  "aún no implementado") ahora es la página funcional genérica, montada en
+  `App.tsx` como `<SeguimientoCategoriaPage config={CONFIG_ORGANIZACIONALES} />`
+  (y análogas para Físicos/Tecnológicos). Los componentes específicos de
+  Personas (`RevisionPersonasFormModal.tsx`, `ChecklistPersonasModal.tsx`,
+  `SeguimientoPersonasPage.tsx`) **no se tocaron ni se generalizaron** — siguen
+  siendo su propia implementación, para no arriesgar la funcionalidad ya en uso.
+- Probado end-to-end contra el backend real (crear revisión Organizacionales →
+  92 respuestas en blanco generadas → responder una → verificar
+  `porcentaje_general` y `porcentajes_por_control` → finalizar → eliminar sin
+  dejar huérfanos), sin dejar datos de prueba.
 
 ### Usuarios
 - El campo "Área" fue reemplazado por "Dirección" (FK, `Dirección 1 — N
