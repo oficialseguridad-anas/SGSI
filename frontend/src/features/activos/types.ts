@@ -82,3 +82,44 @@ export interface DireccionInput {
   nombre: string;
   descripcion: string;
 }
+
+export interface RevisionSemestralActivos {
+  id: number;
+  periodo: string;
+  fecha_revision: string;
+  realizada_por: number | null;
+  realizada_por_nombre: string | null;
+  observaciones: string;
+  cantidad_activos: number;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface RevisionSemestralActivosInput {
+  periodo: string;
+  fecha_revision: string;
+  observaciones: string;
+}
+
+export interface SnapshotActivo {
+  id: number;
+  revision: number;
+  activo_original: number | null;
+  codigo: string;
+  nombre: string;
+  proceso_nombre: string | null;
+  direccion_nombre: string;
+  tipo_activo: TipoActivo;
+  clase_activo: ClaseActivo;
+  naturaleza: NaturalezaActivo;
+  propietario: string;
+  custodio: string;
+  etiquetado: EtiquetadoActivo;
+  contiene_datos_personales: boolean;
+  valor_confidencialidad: NivelValoracion;
+  valor_integridad: NivelValoracion;
+  valor_disponibilidad: NivelValoracion;
+  puntaje_valoracion: number;
+  criticidad: NivelValoracion;
+  estado: EstadoActivo;
+}

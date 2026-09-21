@@ -1,5 +1,9 @@
 INFO:waitress:Serving on http://0.0.0.0:8000
 Unauthorized: /api/v1/riesgos/
 WARNING:django.request:Unauthorized: /api/v1/riesgos/
-Unauthorized: /api/v1/auth/token/refresh/
-WARNING:django.request:Unauthorized: /api/v1/auth/token/refresh/
+Unauthorized: /api/v1/revisiones-activos/
+WARNING:django.request:Unauthorized: /api/v1/revisiones-activos/
+Unauthorized: /api/v1/snapshots-activo/
+WARNING:django.request:Unauthorized: /api/v1/snapshots-activo/
+Unauthorized: /api/v1/direcciones/
+WARNING:django.request:Unauthorized: /api/v1/direcciones/

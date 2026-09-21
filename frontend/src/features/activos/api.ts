@@ -1,5 +1,15 @@
 import { apiClient } from '../../shared/api/client';
-import type { Activo, ActivoInput, Direccion, DireccionInput, Proceso, ProcesoInput } from './types';
+import type {
+  Activo,
+  ActivoInput,
+  Direccion,
+  DireccionInput,
+  Proceso,
+  ProcesoInput,
+  RevisionSemestralActivos,
+  RevisionSemestralActivosInput,
+  SnapshotActivo,
+} from './types';
 
 export async function fetchActivos() {
   const { data } = await apiClient.get<{ results: Activo[]; count: number }>('/activos/');
@@ -39,5 +49,28 @@ export async function fetchDirecciones(proceso?: number) {
 
 export async function crearDireccion(payload: DireccionInput) {
   const { data } = await apiClient.post<Direccion>('/direcciones/', payload);
+  return data;
+}
+
+export async function fetchRevisionesActivos() {
+  const { data } = await apiClient.get<{ results: RevisionSemestralActivos[]; count: number }>(
+    '/revisiones-activos/',
+  );
+  return data;
+}
+
+export async function crearRevisionActivos(payload: RevisionSemestralActivosInput) {
+  const { data } = await apiClient.post<RevisionSemestralActivos>('/revisiones-activos/', payload);
+  return data;
+}
+
+export async function eliminarRevisionActivos(id: number) {
+  await apiClient.delete(`/revisiones-activos/${id}/`);
+}
+
+export async function fetchSnapshotsActivo(revisionId: number) {
+  const { data } = await apiClient.get<{ results: SnapshotActivo[]; count: number }>('/snapshots-activo/', {
+    params: { revision: revisionId },
+  });
   return data;
 }

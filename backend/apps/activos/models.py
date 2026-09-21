@@ -1,4 +1,6 @@
+from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import TimeStampedModel
 
@@ -174,3 +176,81 @@ class Activo(TimeStampedModel):
         if puntaje <= 7:
             return self.NivelValoracion.MEDIA
         return self.NivelValoracion.ALTA
+
+
+class RevisionSemestralActivos(TimeStampedModel):
+    """Cierre de una revisión periódica (semestral, según ISO 27001 A.5.9) de la matriz de
+    activos: al crearla se congela una "foto" del estado completo de todos los activos de
+    ese momento en SnapshotActivo, para poder consultar cómo estaba cada activo (proceso,
+    estado, criticidad, etc.) en cada revisión pasada aunque después se edite o se dé de
+    baja en la matriz viva."""
+
+    periodo = models.CharField(max_length=20, unique=True, verbose_name='Periodo')
+    fecha_revision = models.DateField(
+        default=timezone.localdate, verbose_name='Fecha de revisión', db_column='fechaRevision',
+    )
+    realizada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='revisiones_activos', verbose_name='Realizada por', db_column='realizadaPorId',
+    )
+    observaciones = models.TextField(blank=True, verbose_name='Observaciones')
+
+    class Meta:
+        verbose_name = 'revisión semestral de activos'
+        verbose_name_plural = 'revisiones semestrales de activos'
+        ordering = ['-periodo']
+        db_table = 'revisionSemestralActivos'
+
+    def __str__(self):
+        return self.periodo
+
+    @property
+    def cantidad_activos(self):
+        return self.snapshots.count()
+
+
+class SnapshotActivo(models.Model):
+    """Copia congelada de un Activo tal como estaba al momento de una RevisionSemestralActivos.
+    No se edita a mano: se genera en bloque al crear la revisión (ver perform_create del
+    viewset). `activo_original` queda en null si el activo se elimina después, pero los
+    campos copiados abajo conservan el valor histórico sin importar lo que pase con él."""
+
+    revision = models.ForeignKey(
+        RevisionSemestralActivos, on_delete=models.CASCADE, related_name='snapshots', db_column='revisionId',
+    )
+    activo_original = models.ForeignKey(
+        Activo, on_delete=models.SET_NULL, null=True, blank=True, related_name='snapshots',
+        db_column='activoOriginalId',
+    )
+    codigo = models.CharField(max_length=20, verbose_name='Código')
+    nombre = models.CharField(max_length=200, verbose_name='Nombre del Activo de Información')
+    proceso_nombre = models.CharField(max_length=150, blank=True, null=True, verbose_name='Proceso', db_column='procesoNombre')
+    direccion_nombre = models.CharField(max_length=150, verbose_name='Dirección', db_column='direccionNombre')
+    tipo_activo = models.CharField(max_length=15, choices=Activo.TipoActivo.choices, db_column='tipoActivo')
+    clase_activo = models.CharField(max_length=25, choices=Activo.ClaseActivo.choices, db_column='claseActivo')
+    naturaleza = models.CharField(max_length=15, choices=Activo.Naturaleza.choices)
+    propietario = models.CharField(max_length=250)
+    custodio = models.CharField(max_length=250, blank=True)
+    etiquetado = models.CharField(max_length=15, choices=Activo.Etiquetado.choices)
+    contiene_datos_personales = models.BooleanField(default=False, db_column='contieneDatosPersonales')
+    valor_confidencialidad = models.CharField(
+        max_length=5, choices=Activo.NivelValoracion.choices, db_column='valorConfidencialidad',
+    )
+    valor_integridad = models.CharField(
+        max_length=5, choices=Activo.NivelValoracion.choices, db_column='valorIntegridad',
+    )
+    valor_disponibilidad = models.CharField(
+        max_length=5, choices=Activo.NivelValoracion.choices, db_column='valorDisponibilidad',
+    )
+    puntaje_valoracion = models.PositiveSmallIntegerField(db_column='puntajeValoracion')
+    criticidad = models.CharField(max_length=5, choices=Activo.NivelValoracion.choices)
+    estado = models.CharField(max_length=20, choices=Activo.Estado.choices)
+
+    class Meta:
+        verbose_name = 'foto de activo'
+        verbose_name_plural = 'fotos de activos'
+        ordering = ['codigo']
+        db_table = 'snapshotActivo'
+
+    def __str__(self):
+        return f'{self.codigo} ({self.revision.periodo})'

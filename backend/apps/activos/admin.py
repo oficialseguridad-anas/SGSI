@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Activo, Direccion, Proceso
+from .models import Activo, Direccion, Proceso, RevisionSemestralActivos, SnapshotActivo
 
 
 class DireccionInline(admin.TabularInline):
@@ -48,3 +48,28 @@ class ActivoAdmin(admin.ModelAdmin):
     @admin.display(description='Criticidad')
     def criticidad(self, obj):
         return obj.criticidad.label
+
+
+class SnapshotActivoInline(admin.TabularInline):
+    model = SnapshotActivo
+    extra = 0
+    fields = ['codigo', 'nombre', 'proceso_nombre', 'estado', 'criticidad']
+    readonly_fields = fields
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(RevisionSemestralActivos)
+class RevisionSemestralActivosAdmin(admin.ModelAdmin):
+    list_display = ['periodo', 'fecha_revision', 'realizada_por', 'cantidad_activos']
+    search_fields = ['periodo', 'observaciones']
+    inlines = [SnapshotActivoInline]
+
+
+@admin.register(SnapshotActivo)
+class SnapshotActivoAdmin(admin.ModelAdmin):
+    list_display = ['codigo', 'nombre', 'revision', 'proceso_nombre', 'estado', 'criticidad']
+    list_filter = ['revision', 'estado', 'criticidad']
+    search_fields = ['codigo', 'nombre', 'proceso_nombre']

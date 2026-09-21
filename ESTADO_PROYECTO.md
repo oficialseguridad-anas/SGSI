@@ -1,179 +1,294 @@
 # Estado del proyecto — SGSI ISO/IEC 27001:2022 (ANAS WAYUU EPSI)
 
 Documento de referencia para retomar el proyecto en cualquier momento, sin depender
-de que Claude recuerde la conversación anterior. Última actualización: 2026-08-24.
+de que Claude recuerde la conversación anterior. **Este archivo se debe mantener
+actualizado en cada sesión** — al terminar cambios relevantes (nuevo módulo,
+decisión de diseño, cambio de flujo, pendiente nuevo), reflejarlos aquí.
+
+Última actualización: 2026-09-21 (agregado módulo de Revisiones semestrales de
+Activos y descarga de reporte Excel filtrable de Activos).
 
 ## 1. Qué es esto
 
 Aplicación web de Sistema de Gestión de Seguridad de la Información (SGSI) para
-ANAS WAYUU EPSI, alineada a ISO/IEC 27001:2022. Módulos activos: Dashboard,
-Activos, Riesgos, Controles (Anexo A / SoA), Documentos, Usuarios, Seguridad (2FA).
+ANAS WAYUU EPSI, alineada a ISO/IEC 27001:2022. Módulos activos (ver menú lateral
+real en `frontend/src/shared/layout/Shell.tsx`):
+
+Dashboard, Activos, Riesgos, Controles (Anexo A / SoA), Seguimiento Anexo A
+(Organizacionales / Personas / Físicos / Tecnológicos), Hallazgos de auditoría,
+Matriz de incidentes, Documentos, Indicadores, Objetivos, Usuarios, Seguridad (2FA).
 
 ## 2. Stack técnico
 
 - **Backend:** Django 6.1 + Django REST Framework, servido con `waitress` (no
   `runserver`). Autenticación JWT (`rest_framework_simplejwt`), 2FA (TOTP con
   `pyotp` y OTP por correo).
-- **Base de datos:** **SQL Server 2022 en un contenedor Docker** (migrado desde
-  MySQL). Backend se conecta vía `mssql-django` + `pyodbc`. El motor se
-  selecciona con `DB_ENGINE` en `backend/.env` (`mssql` es el actual; `mysql`
-  quedó como fallback pero ya no se usa).
-- **Frontend:** React 19 + Vite + antd v6 + `@tanstack/react-query` v5 +
-  `react-router-dom` v7. Gráficas del dashboard con **ECharts**
-  (`echarts` + `echarts-for-react`).
-- **Branding institucional:** colores tomados de epsianaswayuu.com (teal/verde
-  oscuro, naranja, dorado) en `frontend/src/shared/theme/brand.ts`. Logo en
-  `frontend/public/logo-anaswayuu.png`.
+- **Base de datos:** SQL Server 2022 en un contenedor Docker (`sgsi-sqlserver`).
+  Backend se conecta vía `mssql-django` + `pyodbc`. El motor se selecciona con
+  `DB_ENGINE` en `backend/.env` (`mssql` es el actual).
+- **Frontend:** React 19 + TypeScript + Vite + antd v6 + `@tanstack/react-query`
+  v5 + `react-router-dom` v7 + `axios`. Gráficas con **Apache ECharts**
+  (`echarts` + `echarts-for-react`), siguiendo el skill interno de dataviz
+  (paleta categórica fija de 8 tonos validada por daltonismo/contraste — ver
+  `frontend/src/features/dashboard/components/*` para el patrón). Vista previa
+  de Excel con `xlsx` (SheetJS) — **instalado desde el CDN oficial de SheetJS**
+  (`https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`), NO desde el registro
+  de npm: la versión de npm (`xlsx@0.18.5`) tiene 2 vulnerabilidades conocidas
+  sin parche (ReDoS + prototype pollution); la de SheetJS CDN sí está corregida.
+  Si se necesita actualizar esa librería, repetir el mismo patrón (nunca volver
+  al paquete `xlsx` del registro de npm sin verificar antes con `npm audit`).
+- **Branding institucional:** colores tomados de epsianaswayuu.com en
+  `frontend/src/shared/theme/brand.ts` (`BRAND.tealDark` = fondo del menú lateral
+  Y del header superior — ambos deben ir siempre del mismo color, es una
+  decisión explícita del usuario). Logo en `frontend/public/logo-anaswayuu.png`,
+  usado también como favicon (`frontend/index.html`) y título de pestaña
+  "SGSI ANAS WAYUU EPSI".
 
-## 3. Cómo iniciar todo (en este orden)
+## 3. Cómo iniciar todo ("inicia proyecto")
 
-### 3.1 Docker Desktop + SQL Server (necesario antes del backend)
+Ritual verificado y usado en todas las sesiones recientes:
 
-Si Docker Desktop no está corriendo, iniciarlo primero y esperar a que el motor
-esté listo (el ícono de la bandeja se pone verde/estable):
+### 3.1 Docker Desktop + SQL Server
+
+```bash
+docker ps --filter name=sgsi-sqlserver
+```
+
+Si Docker Desktop no está corriendo, lanzarlo y esperar (puede tardar hasta
+~100s en aceptar comandos):
 
 ```powershell
 Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
 ```
 
-Luego, desde la raíz del proyecto:
+Reintentar `docker ps` cada 5s hasta que responda, luego verificar salud:
 
-```powershell
-cd C:\Users\oberrio\source\repos\sgsi-iso27001
-docker compose --env-file backend\.env up -d
+```bash
+docker inspect --format='{{.State.Health.Status}}' sgsi-sqlserver
 ```
 
-Verificar que quedó "healthy":
+hasta que devuelva `healthy`.
 
-```powershell
-docker ps --format "{{.Names}}: {{.Status}}"
+### 3.2 Backend (puerto 8000) y Frontend (puerto 5173)
+
+Se lanzan en background con `nohup` + `disown` (Git Bash), no en foreground:
+
+```bash
+cd backend && nohup ./venv/Scripts/waitress-serve.exe --host=0.0.0.0 --port=8000 config.wsgi:application > backend.log 2>&1 & disown
+cd frontend && nohup npm run dev > frontend.log 2>&1 & disown
 ```
 
-### 3.2 Backend (puerto 8000)
+Verificar con curl (esperar `401` en un endpoint autenticado del backend — es la
+respuesta correcta sin token — y `200` en el frontend):
 
-```powershell
-cd C:\Users\oberrio\source\repos\sgsi-iso27001\backend
-.\venv\Scripts\waitress-serve.exe --host=127.0.0.1 --port=8000 config.wsgi:application
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8000/api/v1/riesgos/
+curl -s -o /dev/null -w "%{http_code}\n" http://localhost:5173/
 ```
 
-### 3.3 Frontend (puerto 5173)
+Si alguno no responde, reintentar tras unos segundos (el arranque de waitress y
+de Vite no es instantáneo). Entrar a **http://localhost:5173**.
+
+### 3.3 Problema recurrente
+
+A veces quedan procesos `waitress-serve.exe` "zombis" de sesiones anteriores
+ocupando el puerto 8000. Antes de reiniciar el backend, revisar y matar:
 
 ```powershell
-cd C:\Users\oberrio\source\repos\sgsi-iso27001\frontend
-npm run dev
+Get-CimInstance Win32_Process -Filter "Name='waitress-serve.exe'" | Select-Object -ExpandProperty ProcessId
+Stop-Process -Id <ese_numero> -Force
 ```
-
-Luego entrar a **http://localhost:5173**.
-
-### 3.4 Para detener
-
-- `Ctrl+C` en cada terminal, o buscar el proceso por puerto y matarlo:
-  ```powershell
-  Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | Select -ExpandProperty OwningProcess -Unique
-  Stop-Process -Id <ese_numero> -Force
-  ```
-  (cambiar `8000` por `5173` para el frontend).
-- `docker compose down` para bajar SQL Server (los datos quedan en el volumen
-  Docker, no se pierden).
-
-**⚠️ Problema recurrente:** a veces quedan procesos `waitress-serve.exe`
-"zombis" de sesiones anteriores ocupando el puerto 8000, y el backend falla al
-iniciar. Si eso pasa, revisar el puerto con el comando de arriba y matar el
-proceso antes de reintentar.
 
 ## 4. Estructura de módulos
 
-| Módulo | Backend | Frontend |
+| Módulo | Backend (`backend/apps/`) | Frontend (`frontend/src/features/`) |
 |---|---|---|
-| Cuentas / 2FA / Usuarios | `backend/apps/accounts` | `frontend/src/features/accounts` |
-| Activos | `backend/apps/activos` | `frontend/src/features/activos` |
-| Riesgos | `backend/apps/riesgos` | `frontend/src/features/riesgos` |
-| Controles (Anexo A / SoA) | `backend/apps/controles` | `frontend/src/features/controles` |
-| Documentos | `backend/apps/documentos` | `frontend/src/features/documentos` |
-| Dashboard / gráficas | — | `frontend/src/features/dashboard` |
+| Cuentas / 2FA / Usuarios | `accounts` | `accounts` |
+| Activos | `activos` | `activos` |
+| Riesgos | `riesgos` | `riesgos` |
+| Controles (Anexo A / SoA) | `controles` | `controles` |
+| Seguimiento Anexo A (checklist Personas, etc.) | `revisiones` (p.ej. `RevisionPersonas`, checklist) | `seguimientoAnexoA` |
+| Hallazgos de auditoría | `auditorias` (`Hallazgo`, `SeguimientoHallazgo`, `TipoHallazgo`) | `auditorias` |
+| Matriz de incidentes | `incidentes` (`Incidente`, `ArchivoAdjuntoIncidente`) | `incidentes` |
+| Documentos (con control de versiones) | `documentos` (`Documento`, `VersionDocumento`) | `documentos` |
+| Indicadores | `indicadores` (`Indicador`, `SeguimientoIndicador`) | `indicadores` |
+| Objetivos | `objetivos` (`Objetivo`, `ActividadObjetivo`) | `objetivos` |
+| Dashboard / gráficas | — (consume varias APIs) | `dashboard` |
 
 ## 5. Decisiones de diseño importantes (para no reinventar ni deshacer sin querer)
 
-- **Activos:** relación real `Proceso → Dirección (1-N) → Activo`. Al crear un
-  activo solo se elige la Dirección; el Proceso se deriva y se muestra en la
-  lista. El campo `codigo` se genera automáticamente (0001, 0002...) y no se
-  muestra en el formulario. Criticidad = suma de Confidencialidad+Integridad+
-  Disponibilidad (Baja=1/Media=2/Alta=3): ≤3 Baja, 4-7 Media, 8-9 Alta.
-  `Propietario`/`Custodio` son texto libre (decisión explícita del usuario, no
-  FK a Usuario).
-- **Usuarios:** el campo "Área" fue reemplazado por "Dirección" (FK,
-  `Dirección 1 — N Usuarios`). El módulo de Usuarios (menú, ruta y API) solo es
-  visible para administradores (`is_superuser`).
-- **Riesgos:**
-  - `activos` es multi-selección (M2M), no un solo activo.
-  - Se eliminó el campo/modelo `Vulnerabilidad` por completo.
-  - `Probabilidad` (1-5: Muy Rara…Casi Seguro) e `Impacto` (1/5/10/15/20:
-    Insignificante…Catastrófico) son listas desplegables con nombre y
-    descripción, no números libres.
-  - `Riesgo inherente` = Probabilidad × Impacto (cálculo honesto, sin trucos).
-  - `Nivel de riesgo` (Bajo/Medio/Alto/Crítico) **NO** es un umbral simple sobre
-    el producto — es una **matriz de referencia exacta 5×5** de la entidad
-    (`Riesgo._MATRIZ_NIVEL_DE_RIESGO` en el backend, y su copia idéntica en
-    `frontend/src/features/riesgos/nivelRiesgo.ts`). Incluye una excepción
-    puntual: Casi Seguro × Mayor (5×15=75) se clasifica como **Crítico**
-    aunque el producto matemático sea 75 (en la tabla de referencia esa celda
-    estaba marcada con "76"). Si se ajusta esta matriz, hay que editarla en
-    **ambos** archivos para que coincidan.
-  - Hay un "Mapa de calor" visual (componente `MapaCalorRiesgosModal`)
-    accesible desde el formulario y desde la lista de Riesgos.
-  - El campo `estado` de Riesgo (Identificado/En tratamiento/...) **se eliminó**
-    del modelo. El concepto real de "Opción de Tratamiento"
-    (Mitigar/Transferir/Evitar/Aceptar) vive en el modelo `TratamientoRiesgo`.
-  - **`TratamientoRiesgo` (Opción de tratamiento) todavía NO tiene formulario
-    en el frontend React** — por ahora solo se gestiona desde el admin de
-    Django (`/admin/riesgos/tratamientoriesgo/`). Campos: Opción de
-    tratamiento, Descripción, Acción de mitigación, Recursos necesarios,
-    Responsable, Fecha límite (plazo), Fecha de seguimiento, Fecha de próximo
-    seguimiento, Evidencias esperadas + carga de varios archivos adjuntos
-    (campo `archivos_nuevos`, widget de selección múltiple dentro del mismo
-    formulario), Probabilidad/Impacto residual, Estado (Pendiente/En
-    progreso/Completado/Vencido) — este queda como **último** campo del
-    formulario a propósito.
-- **Migración a SQL Server:** el script de migración de datos vive en
-  `backend/apps/core/management/commands/migrar_mysql_a_sqlserver.py`. Ya se
-  ejecutó una vez y no debería necesitar correr de nuevo salvo que se vuelva a
-  MySQL por algún motivo.
-- **Dashboard:** una sola gráfica por ahora ("Activos por criticidad", dona
-  animada con ECharts). Falta decidir con el usuario cuál es la siguiente
-  gráfica a agregar.
+### Activos
+- Relación real `Proceso → Dirección (1-N) → Activo`. Al crear un activo solo se
+  elige la Dirección; el Proceso se deriva y se muestra en la lista.
+- `codigo` se autogenera (0001, 0002...) y no se muestra en el formulario.
+- Criticidad = suma de Confidencialidad+Integridad+Disponibilidad
+  (Baja=1/Media=2/Alta=3): ≤3 Baja, 4-7 Media, 8-9 Alta.
+- `Propietario`/`Custodio` son texto libre (no FK a Usuario — decisión explícita).
+- **Tarjetas KPI** (`ActivosPage.tsx`) agrupadas por **Proceso** (catálogo
+  dinámico, no un enum fijo): tarjeta "Total" + una por proceso presente en los
+  datos (+ "Sin proceso asignado" si aplica), ordenadas de mayor a menor
+  cantidad, con la misma paleta cíclica de 7 colores que ya usa
+  `GraficaHallazgosPorProceso` en el Dashboard. Cada tarjeta clicable filtra la
+  tabla (toggle); además cada tarjeta muestra un **desglose por Criticidad**
+  (Alta/Media/Baja) debajo del número.
 
-## 6. Bug corregido recientemente (para no reintroducirlo)
+### Activos — Revisiones semestrales (trazabilidad ISO 27001 A.5.9)
+- Requisito del usuario: revisa la matriz de activos cada semestre y quería una
+  "traza"/"foto" de cómo estaba cada activo en cada revisión (por proceso,
+  estado, criticidad), no solo el estado actual.
+- Modelos nuevos en `backend/apps/activos/models.py`:
+  `RevisionSemestralActivos` (periodo único p.ej. `"2026-S1"`, fecha_revision,
+  realizada_por FK a Usuario, observaciones) y `SnapshotActivo` (una fila por
+  cada Activo existente al momento de cerrar la revisión, con **todos los
+  campos copiados como valores planos**, no como referencias — así el
+  histórico no cambia si el Activo original se edita o se elimina después;
+  `activo_original` es un FK opcional solo para trazabilidad, `on_delete=SET_NULL`).
+- Al crear una `RevisionSemestralActivos` (`POST /api/v1/revisiones-activos/`),
+  `RevisionSemestralActivosViewSet.perform_create` recorre **todos** los
+  Activos (incluye `RETIRADO`, es una foto completa) y hace `bulk_create` de un
+  `SnapshotActivo` por cada uno. `GET /api/v1/snapshots-activo/?revision=<id>`
+  lista la foto de una revisión puntual (filtrable también por
+  `estado`/`criticidad`/`tipo_activo`/`clase_activo`/`etiquetado`).
+- Frontend: `frontend/src/features/activos/pages/RevisionesActivosPage.tsx`
+  (ruta `/activos/revisiones`, accesible desde un botón "Revisiones
+  semestrales" en `ActivosPage`). Lista las revisiones cerradas + botón para
+  cerrar una nueva (con periodo sugerido automáticamente: `<año>-S1` si el mes
+  actual es ≤ junio, si no `<año>-S2` — función `periodoActual()`). "Ver foto"
+  abre un `Drawer` (`DetalleRevisionDrawer`) con las mismas tarjetas KPI +
+  desglose por criticidad + filtro por proceso que ya tiene `ActivosPage`, pero
+  sobre los `SnapshotActivo` de esa revisión en vez de los Activos en vivo — es
+  de solo lectura (sin acciones de editar/eliminar activos individuales).
+- Probado end-to-end con Django shell + DRF APIClient (crear revisión con los
+  200 activos reales → 200 snapshots generados → filtro por criticidad ALTA →
+  limpieza), sin dejar datos de prueba.
+
+### Activos — Reporte Excel filtrable por criterios
+- Botón "Descargar Excel" en `ActivosPage` abre
+  `frontend/src/features/activos/components/ExportarActivosModal.tsx`: permite
+  elegir criterios (Proceso, Dirección, Criticidad, Estado — multi-select,
+  cada uno opcional) y descarga un `.xlsx` solo con los activos que cumplen
+  **todos** los criterios elegidos (AND entre criterios, OR dentro de cada
+  uno). Las opciones de Proceso/Dirección se derivan de los propios activos ya
+  cargados en memoria (no pega a `/procesos/` ni `/direcciones/`), y la lista
+  de Direcciones se acota si ya se eligió Proceso.
+- Generado **100% en el navegador** con `xlsx` (SheetJS, la misma librería que
+  ya se usa para previsualizar Excel en Documentos — ver nota de seguridad en
+  la sección de Stack técnico), sin endpoint nuevo en el backend: usa
+  `XLSX.utils.json_to_sheet` + `XLSX.writeFile`. Columnas del reporte: Código,
+  Nombre, Proceso, Dirección, Tipo, Clase, Naturaleza, Propietario, Custodio,
+  Etiquetado, ¿Datos personales?, Confidencialidad, Integridad,
+  Disponibilidad, Puntaje, Criticidad, Estado, Fecha de baja.
+
+### Usuarios
+- El campo "Área" fue reemplazado por "Dirección" (FK, `Dirección 1 — N
+  Usuarios`). El módulo de Usuarios (menú, ruta y API) solo es visible para
+  administradores (`is_superuser`).
+
+### Riesgos
+- `activos` es multi-selección (M2M), no un solo activo.
+- Se eliminó el campo/modelo `Vulnerabilidad` por completo.
+- `Probabilidad` (1-5) e `Impacto` (1/5/10/15/20) son listas desplegables con
+  nombre y descripción, no números libres.
+- `Riesgo inherente` = Probabilidad × Impacto.
+- `Nivel de riesgo` (Bajo/Medio/Alto/Crítico) es una **matriz de referencia
+  exacta 5×5** de la entidad (`Riesgo._MATRIZ_NIVEL_DE_RIESGO` en el backend, y
+  copia idéntica en `frontend/src/features/riesgos/nivelRiesgo.ts`). Si se
+  ajusta, editar **ambos** archivos.
+- Mapa de calor visual (`MapaCalorRiesgosModal`) accesible desde el formulario y
+  la lista.
+- El campo `estado` de Riesgo se eliminó del modelo; la "Opción de Tratamiento"
+  (Mitigar/Transferir/Evitar/Aceptar) vive en `TratamientoRiesgo`, con
+  formulario propio en el frontend (`GestionarTratamientoModal`).
+- **`codigo` de Riesgo (R-001, R-002...) es autogenerado, secuencial y
+  no editable** desde el formulario (se quitó el campo del formulario de
+  creación). Backend: `Riesgo.save()` llama a `_siguiente_codigo()` (mismo
+  patrón que `Hallazgo`/`Incidente` con prefijos `H-`/`INC-`) si `codigo` viene
+  vacío; `codigo` está en `read_only_fields` del serializer.
+- **Tarjetas KPI** (`RiesgosPage.tsx`): "Total" + una por cada estado de
+  tratamiento (`Sin tratamiento` / `Pendiente` / `Vencido` / `Completado`,
+  calculado sobre el tratamiento más reciente de cada riesgo), clicables
+  (toggle) para filtrar la tabla. Cada tarjeta muestra un **desglose por Nivel
+  de riesgo** (Crítico/Alto/Medio/Bajo) debajo del número. Las tarjetas usan
+  `Row align="stretch"` + `Card height:'100%'` para que todas queden de la
+  misma altura aunque alguna no tenga desglose que mostrar (p.ej. "Sin
+  tratamiento" en 0).
+- Columna **"Amenaza"** de la tabla: el texto visible es `amenaza_nombre`
+  (`Amenaza.nombre`, `CharField(max_length=150)` — puede venir truncado si el
+  dato original era más largo). El **tooltip al pasar el mouse** usa
+  `amenaza_descripcion` (`Amenaza.descripcion`, `TextField` sin límite, suele
+  tener el texto completo) con fallback a `amenaza_nombre` si no hay
+  descripción — expuesto como `amenaza_descripcion` en `RiesgoSerializer`.
+
+### Documentos (control de versiones estilo ISO 9001)
+- Se eliminó el campo `descripcion` de `Documento`.
+- Las nuevas versiones de un documento **ya NO crean una fila nueva** en la
+  tabla de Documentos: se acumulan como historial en `VersionDocumento`
+  (versión, `fecha_version`, cambios/descripción, responsable, archivo
+  evidencia). Al crear un `Documento` con archivo se genera automáticamente la
+  "Versión inicial" (`DocumentoViewSet.perform_create`); al agregar una nueva
+  `VersionDocumento` se sincroniza `Documento.version_actual`/`archivo`
+  (`VersionDocumentoViewSet.perform_create`).
+- El **título/nombre del documento es clicable** y abre
+  `HistorialVersionesModal` con todas las versiones históricas + formulario
+  para agregar una nueva.
+- **Vista previa de archivos** (`PrevisualizarDocumentoModal.tsx`): soporta
+  PDF, imágenes (png/jpg/jpeg), texto plano (txt/csv) y **Excel**
+  (xlsx/xls/xlsm — parseado en el navegador con `xlsx`/SheetJS, renderizado
+  como tabla HTML con pestañas si el libro tiene varias hojas). Otros formatos
+  (doc, ppt, zip...) solo se pueden descargar.
+- **Tarjetas KPI** (`DocumentosPage.tsx`) agrupadas por **Tipo** (11 tipos fijos
+  del enum `TipoDocumento`): "Total" + una por tipo, paleta categórica de 11
+  colores (8 validados del skill de dataviz + 3 extendidos), clicables (toggle).
+
+### Hallazgos de auditoría
+- **Tarjetas KPI** (`HallazgosPage.tsx`) por columna **Estado**
+  (`ABIERTA`/`EN_PROCESO`/`CERRADA`): "Total" + una por estado, clicables
+  (toggle), mismos colores que la columna Estado y la gráfica del Dashboard.
+
+### Interfaz general (Shell / layout)
+- Header superior y menú lateral usan el **mismo color** (`BRAND.tealDark`) —
+  tanto en `main.tsx` (token `Layout.headerBg`) como en el `style` inline del
+  `Header` en `Shell.tsx` (que tiene prioridad sobre el token). Íconos/texto del
+  header en blanco para contraste.
+- El `Header` es **sticky** (`position: sticky; top: 0; zIndex: 10`), igual que
+  el `Sider` — al hacer scroll en el contenido, tanto el menú lateral como la
+  barra superior quedan siempre visibles.
+- Patrón de **tarjetas KPI clicables** replicado en Activos, Riesgos, Hallazgos
+  y Documentos: cada página define localmente `TarjetaKpi` + `fondoClaro()`
+  (no está extraído a un componente compartido — se mantuvo duplicado a
+  propósito, seguir el mismo patrón si se agrega a un módulo nuevo). Fondo de
+  la tarjeta = color del estado/categoría al 14% de opacidad (22% si está
+  seleccionada), barra lateral de 4px con el color sólido, número grande +
+  etiqueta, clic hace toggle de un filtro sobre la tabla, con tag "Filtrando
+  por: X" cerrable junto al buscador.
+
+## 6. Bug corregido (para no reintroducirlo)
 
 En `frontend/src/shared/api/client.ts` había un interceptor de Axios que, ante
 **cualquier** 401 (incluido el del propio login con credenciales incorrectas),
 intentaba refrescar el token y —al fallar— hacía `window.location.href =
-'/login'`, recargando toda la página y borrando el mensaje de error antes de
-que se pudiera mostrar. Se corrigió excluyendo las rutas `/auth/token/`,
-`/auth/token/verificar-otp/` y `/auth/token/refresh/` de esa lógica. Si se
-tocan las rutas de autenticación, revisar que esta exclusión siga vigente.
+'/login'`, recargando la página y borrando el mensaje de error. Se corrigió
+excluyendo `/auth/token/`, `/auth/token/verificar-otp/` y
+`/auth/token/refresh/` de esa lógica. Revisar que esta exclusión siga vigente
+si se tocan las rutas de autenticación.
 
 ## 7. Pendientes / cosas sin resolver
 
-- **No hay backups automáticos configurados** para SQL Server (se ofreció
-  durante la sesión, el usuario no ha respondido si los quiere).
-- Un registro de Activo se perdió durante el trabajo de migración temprano
-  (código `890601`, "ANAS WAYUU EPSI") y nunca se pudo recuperar — hay que
-  volver a ingresarlo manualmente si hace falta.
+- No hay backups automáticos configurados para SQL Server.
+- Un registro de Activo se perdió en la migración temprana (código `890601`,
+  "ANAS WAYUU EPSI") y nunca se recuperó — reingresar manualmente si hace falta.
 - Posible error de tipeo sin confirmar: código de dirección "DAU" con
-  descripción "Dierección de auditoria" (¿debería decir "Dirección"?).
-- Sin confirmar: la interpretación de "LaaS" como "IaaS" en una fila de
+  descripción "Dierección de auditoria".
+- Sin confirmar: interpretación de "LaaS" como "IaaS" en una fila de
   servidores GCP del import de Activos.
-- Falta construir el formulario de "Tratamiento de Riesgo" en el frontend
-  React (hoy solo existe en el admin de Django — ver sección 5).
-- Falta definir con el usuario cuál es la siguiente gráfica del dashboard.
+- El dashboard tiene ya varias gráficas por módulo (Activos, Riesgos,
+  Hallazgos, Objetivos, Indicadores) — no revisado a fondo si falta alguna
+  combinación pedida por el usuario.
 
 ## 8. Dónde están las credenciales
 
-Todo vive en `backend/.env` (con extensión `.gitignore`d, nunca se sube a git).
-Incluye: `DB_ENGINE`, credenciales de SQL Server, credenciales del MySQL legado
-(solo para el script de migración), `DJANGO_SECRET_KEY`, credenciales SMTP
-(Gmail) para el envío de códigos OTP por correo.
+Todo vive en `backend/.env` (gitignored). Incluye: `DB_ENGINE`, credenciales de
+SQL Server, `DJANGO_SECRET_KEY`, credenciales SMTP (Gmail) para OTP por correo.
 
 **Usuario administrador actual:** `oficialseguridad@epsianaswayuu.com`
-(superusuario, con 2FA por aplicación ya activado — el código QR ya se
-escaneó, no hay que reconfigurarlo).
+(superusuario, con 2FA por aplicación ya activado).

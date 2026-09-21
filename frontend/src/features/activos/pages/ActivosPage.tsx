@@ -1,12 +1,14 @@
-import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
+import { DownloadOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
 import { useMemo, useState, type CSSProperties } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { ActivoFormModal } from '../components/ActivoFormModal';
+import { ExportarActivosModal } from '../components/ExportarActivosModal';
 import { eliminarActivo, fetchActivos } from '../api';
 import type { Activo, ClaseActivo, EstadoActivo, EtiquetadoActivo, NivelValoracion, TipoActivo } from '../types';
 
@@ -140,6 +142,7 @@ export function ActivosPage() {
   const { data, isLoading, isError } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [activoEditando, setActivoEditando] = useState<Activo | null>(null);
+  const [exportarAbierto, setExportarAbierto] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   // undefined = sin filtro (tarjeta "Total"); null = tarjeta "Sin proceso asignado";
   // string = nombre de un proceso puntual.
@@ -312,9 +315,15 @@ export function ActivosPage() {
     <Card
       title="Activos de información"
       extra={
-        hasPerm('activos.add_activo') && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo activo</Button>
-        )
+        <Space>
+          <Button icon={<DownloadOutlined />} onClick={() => setExportarAbierto(true)}>Descargar Excel</Button>
+          <Link to="/activos/revisiones">
+            <Button>Revisiones semestrales</Button>
+          </Link>
+          {hasPerm('activos.add_activo') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo activo</Button>
+          )}
+        </Space>
       }
     >
       <ErrorCarga visible={isError} entidad="los activos" />
@@ -382,6 +391,7 @@ export function ActivosPage() {
         }}
       />
       <ActivoFormModal open={modalAbierto} activo={activoEditando} onClose={() => setModalAbierto(false)} />
+      <ExportarActivosModal open={exportarAbierto} activos={activos} onClose={() => setExportarAbierto(false)} />
     </Card>
   );
 }

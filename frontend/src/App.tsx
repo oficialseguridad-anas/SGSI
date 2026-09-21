@@ -5,6 +5,7 @@ import { DashboardPage } from './features/accounts/pages/DashboardPage';
 import { SeguridadPage } from './features/accounts/pages/SeguridadPage';
 import { UsuariosPage } from './features/accounts/pages/UsuariosPage';
 import { ActivosPage } from './features/activos/pages/ActivosPage';
+import { RevisionesActivosPage } from './features/activos/pages/RevisionesActivosPage';
 import { HallazgosPage } from './features/auditorias/pages/HallazgosPage';
 import { ControlesPage } from './features/controles/pages/ControlesPage';
 import { DocumentosPage } from './features/documentos/pages/DocumentosPage';
@@ -27,6 +28,7 @@ export default function App() {
         <Route element={<Shell />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/activos" element={<ActivosPage />} />
+          <Route path="/activos/revisiones" element={<RevisionesActivosPage />} />
           <Route path="/riesgos" element={<RiesgosPage />} />
           <Route path="/controles" element={<ControlesPage />} />
           <Route
