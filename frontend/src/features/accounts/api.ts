@@ -1,5 +1,17 @@
 import { apiClient } from '../../shared/api/client';
-import type { LoginResultado, Me, Setup2FA, TokensJWT, Usuario, UsuarioCreateInput, UsuarioUpdateInput } from './types';
+import { descargarArchivo } from '../../shared/api/descargarArchivo';
+import type {
+  Empleado,
+  EmpleadoInput,
+  LoginResultado,
+  Me,
+  ResumenImportacionEmpleados,
+  Setup2FA,
+  TokensJWT,
+  Usuario,
+  UsuarioCreateInput,
+  UsuarioUpdateInput,
+} from './types';
 
 export async function login(email: string, password: string) {
   const { data } = await apiClient.post<LoginResultado>('/auth/token/', { email, password });
@@ -63,6 +75,36 @@ export async function actualizarUsuario(id: number, input: UsuarioUpdateInput) {
 
 export async function eliminarUsuario(id: number) {
   await apiClient.delete(`/usuarios/${id}/`);
+}
+
+export async function fetchEmpleados() {
+  const { data } = await apiClient.get<{ results: Empleado[]; count: number }>('/empleados/');
+  return data;
+}
+
+export async function crearEmpleado(payload: EmpleadoInput) {
+  const { data } = await apiClient.post<Empleado>('/empleados/', payload);
+  return data;
+}
+
+export async function actualizarEmpleado(id: number, payload: EmpleadoInput) {
+  const { data } = await apiClient.put<Empleado>(`/empleados/${id}/`, payload);
+  return data;
+}
+
+export async function eliminarEmpleado(id: number) {
+  await apiClient.delete(`/empleados/${id}/`);
+}
+
+export async function descargarPlantillaEmpleados() {
+  await descargarArchivo('/empleados-plantilla/', 'Plantilla_Empleados.xlsx');
+}
+
+export async function importarEmpleados(archivo: File) {
+  const formData = new FormData();
+  formData.append('archivo', archivo);
+  const { data } = await apiClient.post<ResumenImportacionEmpleados>('/empleados-importar/', formData);
+  return data;
 }
 
 export async function setup2fa() {

@@ -1,3 +1,27 @@
+export interface Empleado {
+  id: number;
+  nombre_completo: string;
+  cargo: string;
+  correo: string;
+  activo: boolean;
+  tiene_usuario: boolean;
+  creado_en: string;
+  actualizado_en: string;
+}
+
+export interface EmpleadoInput {
+  nombre_completo: string;
+  cargo: string;
+  correo: string;
+  activo: boolean;
+}
+
+export interface ResumenImportacionEmpleados {
+  creados: number;
+  actualizados: number;
+  omitidos: string[];
+}
+
 export interface Rol {
   id: number;
   nombre: string;

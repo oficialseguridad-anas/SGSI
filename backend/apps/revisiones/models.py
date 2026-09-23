@@ -408,3 +408,252 @@ class RespuestaChecklistTecnologicos(RespuestaChecklistAnexoABase):
 
     def __str__(self):
         return f'{self.revision} - {self.pregunta}'
+
+
+# --- Revisión por la Dirección (ISO/IEC 27001:2022, cláusula 9.3) --------------------
+
+class RevisionDireccion(TimeStampedModel):
+    """Acta de Revisión por la Dirección: entradas (9.3.2 a-g) y salidas (9.3.3) del
+    SGSI, en el intervalo planificado que la organización defina (semestral, anual...).
+    No hereda de RevisionAnexoABase: no es un checklist de controles, es un acta de
+    reunión con secciones de texto y una lista de compromisos/decisiones."""
+
+    periodo = models.CharField(max_length=30, verbose_name='Periodo', help_text='Ej. "2026-S2" o "2026".')
+    fecha_revision = models.DateField(verbose_name='Fecha de revisión', db_column='fechaRevision')
+    # `preside`/`asistentes` apuntan a Empleado (no a Usuario/AUTH_USER_MODEL): quien
+    # preside una revisión por la dirección suele ser alta gerencia que no
+    # necesariamente tiene ni necesita una cuenta de acceso al sistema.
+    preside = models.ForeignKey(
+        'accounts.Empleado',
+        on_delete=models.PROTECT,
+        related_name='revisiones_direccion_presididas',
+        verbose_name='Preside la revisión (Alta Dirección)',
+        db_column='presideId',
+    )
+    asistentes = models.ManyToManyField(
+        'accounts.Empleado',
+        blank=True,
+        related_name='revisiones_direccion_asistidas',
+        verbose_name='Asistentes',
+        db_table='revisionDireccionAsistentes',
+    )
+    lugar_modalidad = models.CharField(
+        max_length=150, blank=True, verbose_name='Lugar / modalidad', db_column='lugarModalidad'
+    )
+
+    # Entradas — cláusula 9.3.2 a) a g). El literal d) trae 4 sub-puntos propios.
+    estado_acciones_previas = models.TextField(
+        blank=True,
+        verbose_name='a) Estado de las acciones de revisiones por la dirección previas',
+        db_column='estadoAccionesPrevias',
+    )
+    cambios_cuestiones_externas_internas = models.TextField(
+        blank=True,
+        verbose_name='b) Cambios en las cuestiones externas e internas pertinentes al SGSI',
+        db_column='cambiosCuestionesExternasInternas',
+    )
+    cambios_partes_interesadas = models.TextField(
+        blank=True,
+        verbose_name='c) Cambios en las necesidades y expectativas de las partes interesadas',
+        db_column='cambiosPartesInteresadas',
+    )
+    desempeno_no_conformidades = models.TextField(
+        blank=True,
+        verbose_name='d.1) No conformidades y acciones correctivas',
+        db_column='desempenoNoConformidades',
+    )
+    desempeno_seguimiento_medicion = models.TextField(
+        blank=True,
+        verbose_name='d.2) Resultados de seguimiento y medición (indicadores)',
+        db_column='desempenoSeguimientoMedicion',
+    )
+    desempeno_auditorias = models.TextField(
+        blank=True,
+        verbose_name='d.3) Resultados de auditoría',
+        db_column='desempenoAuditorias',
+    )
+    desempeno_objetivos = models.TextField(
+        blank=True,
+        verbose_name='d.4) Cumplimiento de los objetivos de seguridad de la información',
+        db_column='desempenoObjetivos',
+    )
+    retroalimentacion_partes_interesadas = models.TextField(
+        blank=True,
+        verbose_name='e) Retroalimentación de las partes interesadas',
+        db_column='retroalimentacionPartesInteresadas',
+    )
+    resultados_riesgos = models.TextField(
+        blank=True,
+        verbose_name='f) Resultados de la valoración de riesgos y estado del plan de tratamiento',
+        db_column='resultadosRiesgos',
+    )
+    oportunidades_mejora = models.TextField(
+        blank=True,
+        verbose_name='g) Oportunidades de mejora continua',
+        db_column='oportunidadesMejora',
+    )
+    conclusiones_generales = models.TextField(
+        blank=True, verbose_name='Conclusiones generales', db_column='conclusionesGenerales'
+    )
+
+    finalizada = models.BooleanField(
+        default=False,
+        verbose_name='Finalizada',
+        help_text='Una vez finalizada, el acta queda de solo lectura salvo para administradores.',
+    )
+
+    class Meta:
+        verbose_name = 'revisión por la dirección'
+        verbose_name_plural = 'revisiones por la dirección'
+        ordering = ['-fecha_revision']
+        db_table = 'revisionDireccion'
+
+    def __str__(self):
+        return f'Revisión por la Dirección {self.periodo}'
+
+    @property
+    def resumen_datos(self):
+        """Cifras reales de otros módulos, calculadas al vuelo (no se guardan) para que
+        quien diligencia el acta tenga a la mano los insumos de 9.3.2 sin tener que ir
+        módulo por módulo a buscarlos."""
+        from apps.auditorias.models import Hallazgo
+        from apps.incidentes.models import Incidente
+        from apps.indicadores.models import Indicador
+        from apps.objetivos.models import ActividadObjetivo, Objetivo
+        from apps.riesgos.models import Riesgo, TratamientoRiesgo
+
+        riesgos = list(Riesgo.objects.all())
+        por_nivel = {'BAJO': 0, 'MEDIO': 0, 'ALTO': 0, 'CRITICO': 0}
+        for riesgo in riesgos:
+            por_nivel[riesgo.nivel_de_riesgo] += 1
+
+        hallazgos = list(Hallazgo.objects.all())
+        hallazgos_por_estado = {'ABIERTA': 0, 'EN_PROCESO': 0, 'CERRADA': 0}
+        for hallazgo in hallazgos:
+            hallazgos_por_estado[hallazgo.estado] += 1
+
+        actividades = list(ActividadObjetivo.objects.all())
+        actividades_por_estado = {'PENDIENTE': 0, 'VENCIDA': 0, 'COMPLETADA': 0}
+        for actividad in actividades:
+            actividades_por_estado[actividad.estado_ejecucion] += 1
+
+        indicadores = list(Indicador.objects.all())
+        indicadores_al_dia = [i for i in indicadores if i.seguimiento_al_dia]
+        # Compara contra el string 'CUMPLE' en vez de importar
+        # SeguimientoIndicador.EstadoCumplimiento: es justo lo que devuelve la propiedad
+        # `cumplimiento_actual`, y evita un segundo import cruzado innecesario.
+        indicadores_cumple = [i for i in indicadores_al_dia if i.cumplimiento_actual == 'CUMPLE']
+
+        # TratamientoRiesgo.estado es una @property calculada (evidencia adjunta / fecha
+        # límite vencida), no un campo de BD — no se puede filtrar por ella en la BD.
+        tratamientos = list(TratamientoRiesgo.objects.all())
+        tratamientos_pendientes = sum(1 for t in tratamientos if t.estado == TratamientoRiesgo.Estado.PENDIENTE)
+        tratamientos_vencidos = sum(1 for t in tratamientos if t.estado == TratamientoRiesgo.Estado.VENCIDO)
+
+        # Se ordena por `id` (orden real de creación), no por `fecha_revision`: dos actas
+        # pueden compartir la misma fecha de revisión (ej. ambas creadas "hoy" mientras se
+        # prueba o se pone al día el histórico), y con `fecha_revision__lt` esa igualdad
+        # hacía que nunca se encontrara la anterior.
+        revision_anterior = (
+            RevisionDireccion.objects.filter(finalizada=True, id__lt=self.pk or 0)
+            .order_by('-id')
+            .first()
+        )
+        compromisos_revision_anterior = []
+        if revision_anterior:
+            compromisos_revision_anterior = [
+                {
+                    'id': c.id,
+                    'descripcion': c.descripcion,
+                    'responsable_nombre': c.responsable.nombre_completo,
+                    'estado': c.estado,
+                    'fecha_limite': c.fecha_limite,
+                }
+                for c in revision_anterior.compromisos.all()
+            ]
+
+        return {
+            'riesgos': {
+                'total': len(riesgos),
+                'por_nivel': por_nivel,
+                'tratamientos_pendientes': tratamientos_pendientes,
+                'tratamientos_vencidos': tratamientos_vencidos,
+            },
+            'hallazgos': {'total': len(hallazgos), 'por_estado': hallazgos_por_estado},
+            'objetivos': {
+                'total': Objetivo.objects.count(),
+                'actividades_por_estado': actividades_por_estado,
+            },
+            'indicadores': {
+                'total': len(indicadores),
+                'al_dia': len(indicadores_al_dia),
+                'cumple': len(indicadores_cumple),
+            },
+            'incidentes': {'total': Incidente.objects.count()},
+            'revision_anterior_periodo': revision_anterior.periodo if revision_anterior else None,
+            'revision_anterior_fecha': revision_anterior.fecha_revision if revision_anterior else None,
+            'revision_anterior_conclusiones': revision_anterior.conclusiones_generales if revision_anterior else '',
+            'compromisos_revision_anterior': compromisos_revision_anterior,
+        }
+
+    @property
+    def compromisos_pendientes_anteriores(self):
+        """Compromisos que quedaron sin completar en CUALQUIER revisión anterior (no solo
+        la inmediatamente pasada) — para que la sección de Salidas de esta acta permita
+        seguir dándoles cierre sin tener que ir a buscar cada acta vieja por separado.
+        Su estado se sigue editando desde el mismo endpoint de siempre
+        (CompromisoRevisionDireccionViewSet no bloquea por revisión finalizada)."""
+        if not self.pk:
+            return []
+        return list(
+            CompromisoRevisionDireccion.objects.exclude(revision_id=self.pk)
+            .exclude(estado=CompromisoRevisionDireccion.Estado.COMPLETADO)
+            .select_related('revision', 'responsable')
+            .order_by('fecha_limite', 'id')
+        )
+
+
+class CompromisoRevisionDireccion(TimeStampedModel):
+    """Decisión / compromiso de salida de una Revisión por la Dirección (9.3.3) — a la
+    vez que es la fuente de la entrada a) "estado de acciones previas" de la siguiente
+    revisión. Su `estado` se puede seguir actualizando después de finalizada el acta:
+    representa una acción que avanza en el tiempo hasta la próxima revisión, no una
+    valoración puntual como las respuestas de checklist."""
+
+    class Estado(models.TextChoices):
+        PENDIENTE = 'PENDIENTE', 'Pendiente'
+        EN_PROCESO = 'EN_PROCESO', 'En proceso'
+        COMPLETADO = 'COMPLETADO', 'Completado'
+
+    revision = models.ForeignKey(
+        RevisionDireccion, on_delete=models.CASCADE, related_name='compromisos', db_column='revisionId'
+    )
+    descripcion = models.TextField(verbose_name='Compromiso / decisión')
+    responsable = models.ForeignKey(
+        'accounts.Empleado',
+        on_delete=models.PROTECT,
+        related_name='compromisos_revision_direccion',
+        verbose_name='Responsable',
+        db_column='responsableId',
+    )
+    fecha_limite = models.DateField(null=True, blank=True, verbose_name='Fecha límite', db_column='fechaLimite')
+    estado = models.CharField(max_length=15, choices=Estado.choices, default=Estado.PENDIENTE)
+    observaciones_cierre = models.TextField(
+        blank=True, verbose_name='Observaciones de cierre', db_column='observacionesCierre'
+    )
+
+    class Meta:
+        verbose_name = 'compromiso de revisión por la dirección'
+        verbose_name_plural = 'compromisos de revisión por la dirección'
+        ordering = ['fecha_limite', 'id']
+        db_table = 'compromisoRevisionDireccion'
+
+    def __str__(self):
+        return f'{self.revision} - {self.descripcion[:50]}'
+
+    @property
+    def esta_vencido(self):
+        from django.utils import timezone
+        return bool(
+            self.fecha_limite and self.fecha_limite < timezone.localdate() and self.estado != self.Estado.COMPLETADO
+        )

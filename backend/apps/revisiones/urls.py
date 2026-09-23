@@ -1,6 +1,7 @@
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    CompromisoRevisionDireccionViewSet,
     PreguntaChecklistFisicosViewSet,
     PreguntaChecklistOrganizacionalesViewSet,
     PreguntaChecklistPersonasViewSet,
@@ -9,6 +10,7 @@ from .views import (
     RespuestaChecklistOrganizacionalesViewSet,
     RespuestaChecklistPersonasViewSet,
     RespuestaChecklistTecnologicosViewSet,
+    RevisionDireccionViewSet,
     RevisionFisicosViewSet,
     RevisionOrganizacionalesViewSet,
     RevisionPersonasViewSet,
@@ -52,6 +54,11 @@ router.register(
     'respuestas-checklist-tecnologicos',
     RespuestaChecklistTecnologicosViewSet,
     basename='respuestachecklisttecnologicos',
+)
+
+router.register('revisiones-direccion', RevisionDireccionViewSet, basename='revisiondireccion')
+router.register(
+    'compromisos-revision-direccion', CompromisoRevisionDireccionViewSet, basename='compromisorevisiondireccion'
 )
 
 urlpatterns = router.urls

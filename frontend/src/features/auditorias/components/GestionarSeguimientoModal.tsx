@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Modal, Popconfirm, Space, Table, Tag, Typography, message } from 'antd';
 import { useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
+import type { Auditoria } from '../../auditoriaInterna/types';
 import { eliminarSeguimiento, fetchSeguimientos } from '../api';
 import type { Hallazgo, SeguimientoHallazgo } from '../types';
 import { PrevisualizarEvidenciasModal } from './PrevisualizarEvidenciasModal';
@@ -25,10 +26,12 @@ const NOMBRE_VERIFICACION: Record<SeguimientoHallazgo['verificacion_eficacia'], 
 interface Props {
   open: boolean;
   hallazgo: Hallazgo | null;
+  auditoriaRelacionada?: Auditoria;
+  onRelacionar?: () => void;
   onClose: () => void;
 }
 
-export function GestionarSeguimientoModal({ open, hallazgo, onClose }: Props) {
+export function GestionarSeguimientoModal({ open, hallazgo, auditoriaRelacionada, onRelacionar, onClose }: Props) {
   const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const [formAbierto, setFormAbierto] = useState(false);
@@ -175,11 +178,22 @@ export function GestionarSeguimientoModal({ open, hallazgo, onClose }: Props) {
         width={1300}
         destroyOnHidden
       >
-        {hasPerm('auditorias.add_seguimientohallazgo') && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
-              Agregar seguimiento
-            </Button>
+        {(auditoriaRelacionada || hasPerm('auditorias.add_seguimientohallazgo')) && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              {auditoriaRelacionada && onRelacionar && hasPerm('auditorias.change_hallazgo') && (
+                <Button onClick={onRelacionar}>
+                  {hallazgo?.auditoria === auditoriaRelacionada.id
+                    ? `Relacionado con ${auditoriaRelacionada.codigo} (${hallazgo.items_checklist_relacionados.length})`
+                    : `Relacionar con auditoría ${auditoriaRelacionada.codigo}`}
+                </Button>
+              )}
+            </div>
+            {hasPerm('auditorias.add_seguimientohallazgo') && (
+              <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>
+                Agregar seguimiento
+              </Button>
+            )}
           </div>
         )}
         <Table

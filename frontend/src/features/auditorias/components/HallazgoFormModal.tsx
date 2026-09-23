@@ -81,12 +81,12 @@ export function HallazgoFormModal({ open, hallazgo, onClose }: Props) {
   }, [open, hallazgo, form]);
 
   const mutation = useMutation({
-    mutationFn: (values: FormValues) => {
+    mutationFn: async (values: FormValues) => {
       const payload: HallazgoInput = {
         ...values,
         fecha_deteccion: values.fecha_deteccion.format('YYYY-MM-DD'),
       };
-      return hallazgo ? actualizarHallazgo(hallazgo.id, payload) : crearHallazgo(payload);
+      return hallazgo ? await actualizarHallazgo(hallazgo.id, payload) : await crearHallazgo(payload);
     },
     onSuccess: () => {
       message.success(hallazgo ? 'Hallazgo actualizado.' : 'Hallazgo creado.');

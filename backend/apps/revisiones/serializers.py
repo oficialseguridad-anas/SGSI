@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .models import (
+    CompromisoRevisionDireccion,
     PreguntaChecklistFisicos,
     PreguntaChecklistOrganizacionales,
     PreguntaChecklistPersonas,
@@ -9,6 +10,7 @@ from .models import (
     RespuestaChecklistOrganizacionales,
     RespuestaChecklistPersonas,
     RespuestaChecklistTecnologicos,
+    RevisionDireccion,
     RevisionFisicos,
     RevisionOrganizacionales,
     RevisionPersonas,
@@ -179,3 +181,45 @@ class RespuestaChecklistTecnologicosSerializer(serializers.ModelSerializer):
             'creado_en', 'actualizado_en',
         ]
         read_only_fields = ['id', 'revision', 'pregunta', 'creado_en', 'actualizado_en']
+
+
+# --- Revisión por la Dirección (9.3) ---------------------------------------------------
+
+class CompromisoRevisionDireccionSerializer(serializers.ModelSerializer):
+    responsable_nombre = serializers.CharField(source='responsable.nombre_completo', read_only=True)
+    esta_vencido = serializers.BooleanField(read_only=True)
+    revision_periodo = serializers.CharField(source='revision.periodo', read_only=True)
+
+    class Meta:
+        model = CompromisoRevisionDireccion
+        fields = [
+            'id', 'revision', 'revision_periodo', 'descripcion', 'responsable', 'responsable_nombre',
+            'fecha_limite', 'estado', 'esta_vencido', 'observaciones_cierre',
+            'creado_en', 'actualizado_en',
+        ]
+        read_only_fields = ['id', 'creado_en', 'actualizado_en']
+
+
+class RevisionDireccionSerializer(serializers.ModelSerializer):
+    preside_nombre = serializers.CharField(source='preside.nombre_completo', read_only=True)
+    asistentes_nombres = serializers.SerializerMethodField()
+    compromisos = CompromisoRevisionDireccionSerializer(many=True, read_only=True)
+    compromisos_pendientes_anteriores = CompromisoRevisionDireccionSerializer(many=True, read_only=True)
+    resumen_datos = serializers.ReadOnlyField()
+
+    class Meta:
+        model = RevisionDireccion
+        fields = [
+            'id', 'periodo', 'fecha_revision', 'preside', 'preside_nombre',
+            'asistentes', 'asistentes_nombres', 'lugar_modalidad',
+            'estado_acciones_previas', 'cambios_cuestiones_externas_internas',
+            'cambios_partes_interesadas', 'desempeno_no_conformidades',
+            'desempeno_seguimiento_medicion', 'desempeno_auditorias', 'desempeno_objetivos',
+            'retroalimentacion_partes_interesadas', 'resultados_riesgos', 'oportunidades_mejora',
+            'conclusiones_generales', 'finalizada', 'compromisos', 'compromisos_pendientes_anteriores',
+            'resumen_datos', 'creado_en', 'actualizado_en',
+        ]
+        read_only_fields = ['id', 'creado_en', 'actualizado_en']
+
+    def get_asistentes_nombres(self, obj):
+        return [u.nombre_completo for u in obj.asistentes.all()]

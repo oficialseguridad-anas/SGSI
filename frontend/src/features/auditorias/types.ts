@@ -39,6 +39,13 @@ export interface SeguimientoHallazgoInput {
   verificacion_eficacia: VerificacionEficacia;
 }
 
+export interface ItemChecklistRelacionado {
+  id: number;
+  descripcion_elemento: string;
+  requisito_iso: string;
+  tipo_hallazgo: string;
+}
+
 export interface Hallazgo {
   id: number;
   codigo: string;
@@ -58,6 +65,9 @@ export interface Hallazgo {
   numerales_nombres: string[];
   analisis_causa: string;
   estado: EstadoHallazgo;
+  auditoria: number | null;
+  auditoria_codigo: string | null;
+  items_checklist_relacionados: ItemChecklistRelacionado[];
   seguimientos: SeguimientoHallazgo[];
   creado_en: string;
   actualizado_en: string;

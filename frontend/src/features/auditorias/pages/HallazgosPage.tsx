@@ -1,13 +1,16 @@
 import { PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tabs, Tag, Typography, message } from 'antd';
 import { useMemo, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
+import { fetchAuditorias } from '../../auditoriaInterna/api';
+import type { Auditoria } from '../../auditoriaInterna/types';
 import { GestionarSeguimientoModal } from '../components/GestionarSeguimientoModal';
 import { HallazgoFormModal } from '../components/HallazgoFormModal';
+import { RelacionarChecklistModal } from '../components/RelacionarChecklistModal';
 import { eliminarHallazgo, fetchHallazgos } from '../api';
 import { COLOR_ESTADO_HALLAZGO, NOMBRE_ESTADO_HALLAZGO, TEXTO_ESTADO_HALLAZGO } from '../estadoHallazgo';
 import { NOMBRE_TIPO_HALLAZGO } from '../tipoHallazgo';
@@ -78,10 +81,14 @@ export function HallazgosPage() {
   const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ['hallazgos'], queryFn: fetchHallazgos });
+  const { data: auditorias } = useQuery({ queryKey: ['auditorias'], queryFn: () => fetchAuditorias() });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [hallazgoEditando, setHallazgoEditando] = useState<Hallazgo | null>(null);
   const [seguimientoModalAbierto, setSeguimientoModalAbierto] = useState(false);
   const [hallazgoParaSeguimiento, setHallazgoParaSeguimiento] = useState<Hallazgo | null>(null);
+  const [relacionarModalAbierto, setRelacionarModalAbierto] = useState(false);
+  const [hallazgoParaRelacionar, setHallazgoParaRelacionar] = useState<Hallazgo | null>(null);
+  const [auditoriaParaRelacionar, setAuditoriaParaRelacionar] = useState<Auditoria | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoHallazgo | null>(null);
 
@@ -120,6 +127,40 @@ export function HallazgosPage() {
     setFiltroEstado((actual) => (actual === estado ? null : estado));
   }
 
+  // La auditoría "real" de un año es la primera (más reciente) Auditoria con fecha de
+  // ejecución dentro de ese año — con eso se decide en qué pestañas aparece la columna
+  // para relacionar hallazgos con la Lista de Verificación de esa auditoría.
+  const auditoriaPorAnio = useMemo(() => {
+    const mapa = new Map<number, Auditoria>();
+    (auditorias?.results ?? []).forEach((auditoria) => {
+      if (!auditoria.fecha_auditoria) return;
+      const anio = Number(auditoria.fecha_auditoria.slice(0, 4));
+      const actual = mapa.get(anio);
+      if (!actual || auditoria.fecha_auditoria > actual.fecha_auditoria!) {
+        mapa.set(anio, auditoria);
+      }
+    });
+    return mapa;
+  }, [auditorias]);
+
+  const hallazgosPorAnio = useMemo(() => {
+    const mapa = new Map<number, Hallazgo[]>();
+    hallazgosFiltrados.forEach((hallazgo) => {
+      const anio = Number(hallazgo.fecha_deteccion.slice(0, 4));
+      if (!mapa.has(anio)) mapa.set(anio, []);
+      mapa.get(anio)!.push(hallazgo);
+    });
+    return mapa;
+  }, [hallazgosFiltrados]);
+
+  const anios = useMemo(() => Array.from(hallazgosPorAnio.keys()).sort((a, b) => b - a), [hallazgosPorAnio]);
+
+  function abrirRelacionar(hallazgo: Hallazgo, auditoria: Auditoria) {
+    setHallazgoParaRelacionar(hallazgo);
+    setAuditoriaParaRelacionar(auditoria);
+    setRelacionarModalAbierto(true);
+  }
+
   const eliminarMutation = useMutation({
     mutationFn: eliminarHallazgo,
     onSuccess: () => {
@@ -143,6 +184,10 @@ export function HallazgosPage() {
     setHallazgoParaSeguimiento(hallazgo);
     setSeguimientoModalAbierto(true);
   }
+
+  const auditoriaParaSeguimiento = hallazgoParaSeguimiento
+    ? auditoriaPorAnio.get(Number(hallazgoParaSeguimiento.fecha_deteccion.slice(0, 4)))
+    : undefined;
 
   const columns = [
     {
@@ -344,23 +389,46 @@ export function HallazgosPage() {
           </Typography.Text>
         )}
       </div>
-      <Table
-        rowKey="id"
-        loading={isLoading}
-        columns={columns}
-        dataSource={hallazgosFiltrados}
-        pagination={false}
-        scroll={{ x: 1950 }}
-        locale={{
-          emptyText:
-            busqueda || filtroEstado ? <Empty description="Ningún hallazgo coincide con el filtro aplicado." /> : undefined,
-        }}
-      />
+      {anios.length === 0 ? (
+        <Empty description="No hay hallazgos registrados todavía." />
+      ) : (
+        <Tabs
+          items={anios.map((anio) => ({
+            key: String(anio),
+            label: `${anio} (${hallazgosPorAnio.get(anio)?.length ?? 0})`,
+            children: (
+              <Table
+                rowKey="id"
+                loading={isLoading}
+                columns={columns}
+                dataSource={hallazgosPorAnio.get(anio) ?? []}
+                pagination={false}
+                scroll={{ x: 1950 }}
+                locale={{
+                  emptyText:
+                    busqueda || filtroEstado ? (
+                      <Empty description="Ningún hallazgo coincide con el filtro aplicado." />
+                    ) : undefined,
+                }}
+              />
+            ),
+          }))}
+        />
+      )}
       <HallazgoFormModal open={modalAbierto} hallazgo={hallazgoEditando} onClose={() => setModalAbierto(false)} />
       <GestionarSeguimientoModal
         open={seguimientoModalAbierto}
         hallazgo={hallazgoParaSeguimiento}
+        auditoriaRelacionada={auditoriaParaSeguimiento}
+        onRelacionar={() => abrirRelacionar(hallazgoParaSeguimiento!, auditoriaParaSeguimiento!)}
         onClose={() => setSeguimientoModalAbierto(false)}
+      />
+      <RelacionarChecklistModal
+        open={relacionarModalAbierto}
+        hallazgo={hallazgoParaRelacionar}
+        auditoriaId={auditoriaParaRelacionar?.id ?? null}
+        auditoriaCodigo={auditoriaParaRelacionar?.codigo ?? null}
+        onClose={() => setRelacionarModalAbierto(false)}
       />
     </Card>
   );

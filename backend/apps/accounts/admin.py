@@ -6,10 +6,18 @@ from .models import (
     BitacoraAccion,
     CodigoOtpCorreo,
     CodigoRecuperacionOtp,
+    Empleado,
     Rol,
     Usuario,
     UsuarioRol,
 )
+
+
+@admin.register(Empleado)
+class EmpleadoAdmin(admin.ModelAdmin):
+    list_display = ['nombre_completo', 'cargo', 'correo', 'activo']
+    list_filter = ['activo']
+    search_fields = ['nombre_completo', 'cargo', 'correo']
 
 
 @admin.register(Usuario)

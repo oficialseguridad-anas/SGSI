@@ -3,6 +3,7 @@ import { CambiarPasswordPage } from './features/accounts/pages/CambiarPasswordPa
 import { LoginPage } from './features/accounts/pages/LoginPage';
 import { DashboardPage } from './features/accounts/pages/DashboardPage';
 import { SeguridadPage } from './features/accounts/pages/SeguridadPage';
+import { EmpleadosPage } from './features/accounts/pages/EmpleadosPage';
 import { UsuariosPage } from './features/accounts/pages/UsuariosPage';
 import { ActivosPage } from './features/activos/pages/ActivosPage';
 import { RevisionesActivosPage } from './features/activos/pages/RevisionesActivosPage';
@@ -13,6 +14,11 @@ import { IncidentesPage } from './features/incidentes/pages/IncidentesPage';
 import { IndicadoresPage } from './features/indicadores/pages/IndicadoresPage';
 import { ObjetivosPage } from './features/objetivos/pages/ObjetivosPage';
 import { RiesgosPage } from './features/riesgos/pages/RiesgosPage';
+import { RevisionDireccionPage } from './features/revisionDireccion/pages/RevisionDireccionPage';
+import { AuditoriasPage } from './features/auditoriaInterna/pages/AuditoriasPage';
+import { MatrizPriorizacionPage } from './features/auditoriaInterna/pages/MatrizPriorizacionPage';
+import { ProgramaAuditoriaPage } from './features/auditoriaInterna/pages/ProgramaAuditoriaPage';
+import { BackupsPage } from './features/sistema/pages/BackupsPage';
 import { CONFIG_FISICOS, CONFIG_ORGANIZACIONALES, CONFIG_TECNOLOGICOS } from './features/seguimientoAnexoA/configCategorias';
 import { SeguimientoCategoriaPage } from './features/seguimientoAnexoA/pages/SeguimientoCategoriaPage';
 import { SeguimientoPersonasPage } from './features/seguimientoAnexoA/pages/SeguimientoPersonasPage';
@@ -50,8 +56,14 @@ export default function App() {
           <Route path="/documentos" element={<DocumentosPage />} />
           <Route path="/indicadores" element={<IndicadoresPage />} />
           <Route path="/objetivos" element={<ObjetivosPage />} />
+          <Route path="/revision-direccion" element={<RevisionDireccionPage />} />
+          <Route path="/matriz-priorizacion-auditoria" element={<MatrizPriorizacionPage />} />
+          <Route path="/programa-auditoria" element={<ProgramaAuditoriaPage />} />
+          <Route path="/auditorias" element={<AuditoriasPage />} />
+          <Route path="/empleados" element={<EmpleadosPage />} />
           <Route element={<AdminRoute />}>
             <Route path="/usuarios" element={<UsuariosPage />} />
+            <Route path="/backups" element={<BackupsPage />} />
           </Route>
           <Route path="/seguridad" element={<SeguridadPage />} />
         </Route>

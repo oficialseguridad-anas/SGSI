@@ -1,0 +1,124 @@
+INFO:waitress:Serving on http://0.0.0.0:8000
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+WARNING:waitress.queue:Task queue depth is 1
+WARNING:waitress.queue:Task queue depth is 1
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/incidentes/
+WARNING:django.request:Unauthorized: /api/v1/incidentes/
+Unauthorized: /api/v1/auth/token/refresh/
+WARNING:django.request:Unauthorized: /api/v1/auth/token/refresh/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/activos/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/riesgos/
+Unauthorized: /api/v1/indicadores/
+WARNING:django.request:Unauthorized: /api/v1/activos/
+Unauthorized: /api/v1/objetivos/
+WARNING:django.request:Unauthorized: /api/v1/riesgos/
+WARNING:django.request:Unauthorized: /api/v1/indicadores/
+WARNING:django.request:Unauthorized: /api/v1/objetivos/
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+WARNING:waitress.queue:Task queue depth is 1
+WARNING:waitress.queue:Task queue depth is 1
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/revisiones-organizacionales/
+WARNING:django.request:Unauthorized: /api/v1/revisiones-organizacionales/
+WARNING:waitress.queue:Task queue depth is 1
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/activos/
+WARNING:django.request:Unauthorized: /api/v1/activos/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/matriz-priorizacion-auditoria/
+WARNING:django.request:Unauthorized: /api/v1/matriz-priorizacion-auditoria/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+Unauthorized: /api/v1/procesos/
+WARNING:django.request:Unauthorized: /api/v1/procesos/
+Unauthorized: /api/v1/auditorias/3/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/3/
+Unauthorized: /api/v1/empleados/
+WARNING:django.request:Unauthorized: /api/v1/empleados/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/revisiones-personas/
+WARNING:django.request:Unauthorized: /api/v1/revisiones-personas/
+Unauthorized: /api/v1/procesos/
+WARNING:django.request:Unauthorized: /api/v1/procesos/
+Unauthorized: /api/v1/empleados/
+WARNING:django.request:Unauthorized: /api/v1/empleados/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+Unauthorized: /api/v1/auditorias/3/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/3/
+Unauthorized: /api/v1/respuestas-checklist-fisicos/
+WARNING:django.request:Unauthorized: /api/v1/respuestas-checklist-fisicos/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/indicadores/
+WARNING:django.request:Unauthorized: /api/v1/indicadores/
+Unauthorized: /api/v1/procesos/
+WARNING:django.request:Unauthorized: /api/v1/procesos/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+Unauthorized: /api/v1/auditorias/3/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/3/
+Unauthorized: /api/v1/empleados/
+WARNING:django.request:Unauthorized: /api/v1/empleados/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/soa/
+WARNING:django.request:Unauthorized: /api/v1/soa/
+Unauthorized: /api/v1/revisiones-organizacionales/
+WARNING:django.request:Unauthorized: /api/v1/revisiones-organizacionales/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+Unauthorized: /api/v1/auth/token/refresh/
+WARNING:django.request:Unauthorized: /api/v1/auth/token/refresh/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/items-verificacion-auditoria/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/hallazgos/
+WARNING:django.request:Unauthorized: /api/v1/hallazgos/
+Unauthorized: /api/v1/items-verificacion-auditoria/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+WARNING:waitress.queue:Task queue depth is 1
+Unauthorized: /api/v1/seguimientos-hallazgo/
+WARNING:django.request:Unauthorized: /api/v1/seguimientos-hallazgo/
+Unauthorized: /api/v1/items-verificacion-auditoria/40/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/40/
+Unauthorized: /api/v1/items-verificacion-auditoria/53/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/53/
+Unauthorized: /api/v1/items-verificacion-auditoria/64/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/64/
+Unauthorized: /api/v1/items-verificacion-auditoria/69/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/69/
+Unauthorized: /api/v1/auditorias/
+WARNING:django.request:Unauthorized: /api/v1/auditorias/
+Unauthorized: /api/v1/items-verificacion-auditoria/60/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/60/
+Unauthorized: /api/v1/items-verificacion-auditoria/73/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/73/
+Unauthorized: /api/v1/revisiones-fisicos/
+WARNING:django.request:Unauthorized: /api/v1/revisiones-fisicos/
+Unauthorized: /api/v1/items-verificacion-auditoria/94/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/94/
+Unauthorized: /api/v1/items-verificacion-auditoria/97/
+WARNING:django.request:Unauthorized: /api/v1/items-verificacion-auditoria/97/

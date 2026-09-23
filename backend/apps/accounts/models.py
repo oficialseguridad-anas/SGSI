@@ -7,6 +7,28 @@ from django.db import models
 from apps.core.models import TimeStampedModel
 
 
+class Empleado(TimeStampedModel):
+    """Directorio de personas de la organización, independiente de si tienen o no una
+    cuenta de acceso al sistema (Usuario). Permite nombrar a alguien como responsable,
+    revisor, asistente, etc. en cualquier módulo sin tener que crearle una cuenta con
+    login — un Usuario es, opcionalmente, un Empleado al que además se le dio acceso
+    (ver Usuario.empleado más abajo)."""
+
+    nombre_completo = models.CharField(max_length=150, db_column='nombreCompleto')
+    cargo = models.CharField(max_length=100, blank=True)
+    correo = models.EmailField(blank=True)
+    activo = models.BooleanField(default=True, verbose_name='¿Activo en la organización?')
+
+    class Meta:
+        verbose_name = 'empleado'
+        verbose_name_plural = 'empleados'
+        ordering = ['nombre_completo']
+        db_table = 'empleado'
+
+    def __str__(self):
+        return self.nombre_completo
+
+
 class UsuarioManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
         if not email:
@@ -33,6 +55,15 @@ class Usuario(AbstractUser):
     email = models.EmailField('email', unique=True)
     nombre_completo = models.CharField(max_length=150, db_column='nombreCompleto')
     cargo = models.CharField(max_length=100, blank=True)
+    empleado = models.OneToOneField(
+        Empleado,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='usuario',
+        verbose_name='Empleado asociado',
+        db_column='empleadoId',
+    )
     direccion = models.ForeignKey(
         'activos.Direccion',
         on_delete=models.SET_NULL,

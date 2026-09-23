@@ -23,6 +23,14 @@ export async function actualizarHallazgo(id: number, payload: HallazgoInput) {
   return data;
 }
 
+/** Relaciona (o quita la relación, pasando null) un hallazgo ya existente con una
+ * Auditoria del módulo de Auditoría Interna, sin tocar el resto de sus datos — se usa
+ * desde la columna "Relacionar" del módulo de Hallazgos, organizada por año. */
+export async function vincularHallazgoAAuditoria(id: number, auditoriaId: number | null) {
+  const { data } = await apiClient.patch<Hallazgo>(`/hallazgos/${id}/`, { auditoria: auditoriaId });
+  return data;
+}
+
 export async function eliminarHallazgo(id: number) {
   await apiClient.delete(`/hallazgos/${id}/`);
 }

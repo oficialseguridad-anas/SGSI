@@ -6,12 +6,15 @@ services:
       - backend/.env
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
       MSSQL_PID: Express
     ports:
       - "${MSSQL_PORT:-1433}:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
+      # Carpeta del host montada dentro del contenedor: BACKUP DATABASE escribe el
+      # .bak aquí y queda visible directamente en Windows, sin necesidad de `docker cp`
+      # (backend/scripts/backup_sgsi.ps1 depende de este mount).
+      - ./backend/backups/sqlserver:/var/opt/mssql/backup
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -Q 'SELECT 1' -b || exit 1"]
       interval: 10s

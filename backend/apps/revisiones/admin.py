@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    CompromisoRevisionDireccion,
     PreguntaChecklistFisicos,
     PreguntaChecklistOrganizacionales,
     PreguntaChecklistPersonas,
@@ -9,6 +10,7 @@ from .models import (
     RespuestaChecklistOrganizacionales,
     RespuestaChecklistPersonas,
     RespuestaChecklistTecnologicos,
+    RevisionDireccion,
     RevisionFisicos,
     RevisionOrganizacionales,
     RevisionPersonas,
@@ -66,3 +68,26 @@ def registrar_categoria_anexo_a(modelo_revision, modelo_pregunta, modelo_respues
 registrar_categoria_anexo_a(RevisionOrganizacionales, PreguntaChecklistOrganizacionales, RespuestaChecklistOrganizacionales)
 registrar_categoria_anexo_a(RevisionFisicos, PreguntaChecklistFisicos, RespuestaChecklistFisicos)
 registrar_categoria_anexo_a(RevisionTecnologicos, PreguntaChecklistTecnologicos, RespuestaChecklistTecnologicos)
+
+
+class CompromisoRevisionDireccionInline(admin.TabularInline):
+    model = CompromisoRevisionDireccion
+    extra = 0
+    fields = ['descripcion', 'responsable', 'fecha_limite', 'estado']
+    autocomplete_fields = ['responsable']
+
+
+@admin.register(RevisionDireccion)
+class RevisionDireccionAdmin(admin.ModelAdmin):
+    list_display = ['periodo', 'fecha_revision', 'preside', 'finalizada']
+    list_filter = ['finalizada']
+    search_fields = ['periodo']
+    autocomplete_fields = ['preside', 'asistentes']
+    inlines = [CompromisoRevisionDireccionInline]
+
+
+@admin.register(CompromisoRevisionDireccion)
+class CompromisoRevisionDireccionAdmin(admin.ModelAdmin):
+    list_display = ['revision', 'descripcion', 'responsable', 'fecha_limite', 'estado']
+    list_filter = ['estado']
+    autocomplete_fields = ['revision', 'responsable']

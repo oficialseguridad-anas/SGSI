@@ -212,6 +212,10 @@ else:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
     DEFAULT_FROM_EMAIL = 'sgsi@localhost'
 
+# Correo al que se envía el resumen de cada backup (manual o programado). Si se deja
+# vacío, se envía a todos los Usuario con is_superuser=True.
+BACKUP_NOTIFICATION_EMAIL = env('BACKUP_NOTIFICATION_EMAIL', default='')
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',

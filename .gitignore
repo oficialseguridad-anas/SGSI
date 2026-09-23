@@ -7,6 +7,8 @@ backend/.env
 backend/media/
 backend/staticfiles/
 backend/db.sqlite3
+backend/backups/
+backend/*.log
 
 # Frontend (Node/React)
 frontend/node_modules/

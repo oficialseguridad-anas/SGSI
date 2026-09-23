@@ -1,11 +1,13 @@
 import {
   AimOutlined,
   AlertOutlined,
-  AuditOutlined,
+  CloudUploadOutlined,
   DashboardOutlined,
+  ScheduleOutlined,
   DatabaseOutlined,
   FileTextOutlined,
   FolderOutlined,
+  IdcardOutlined,
   KeyOutlined,
   LineChartOutlined,
   LogoutOutlined,
@@ -13,6 +15,7 @@ import {
   MenuUnfoldOutlined,
   SafetyCertificateOutlined,
   SafetyOutlined,
+  SolutionOutlined,
   TeamOutlined,
   WarningOutlined,
 } from '@ant-design/icons';
@@ -61,13 +64,6 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    key: 'hallazgos',
-    path: '/hallazgos',
-    label: 'Hallazgos de auditoría',
-    icon: <AuditOutlined />,
-    perm: 'auditorias.view_hallazgo',
-  },
-  {
     key: 'incidentes',
     path: '/incidentes',
     label: 'Matriz de incidentes',
@@ -95,7 +91,39 @@ const NAV_ITEMS: NavItem[] = [
     icon: <AimOutlined />,
     perm: 'objetivos.view_objetivo',
   },
+  {
+    key: 'revision-direccion',
+    path: '/revision-direccion',
+    label: 'Revisión por la Dirección',
+    icon: <SolutionOutlined />,
+    perm: 'revisiones.view_revisiondireccion',
+  },
+  {
+    key: 'auditoria-interna',
+    label: 'Auditoría Interna',
+    icon: <ScheduleOutlined />,
+    children: [
+      { key: 'matriz-priorizacion-auditoria', path: '/matriz-priorizacion-auditoria', label: 'Matriz de Priorización', icon: null },
+      { key: 'programa-auditoria', path: '/programa-auditoria', label: 'Programa Anual', icon: null },
+      { key: 'auditorias', path: '/auditorias', label: 'Auditorías', icon: null },
+      {
+        key: 'hallazgos',
+        path: '/hallazgos',
+        label: 'Hallazgos de auditoría',
+        icon: null,
+        perm: 'auditorias.view_hallazgo',
+      },
+    ],
+  },
+  {
+    key: 'empleados',
+    path: '/empleados',
+    label: 'Empleados',
+    icon: <IdcardOutlined />,
+    perm: 'accounts.view_empleado',
+  },
   { key: 'usuarios', path: '/usuarios', label: 'Usuarios', icon: <TeamOutlined />, adminOnly: true },
+  { key: 'backups', path: '/backups', label: 'Backups', icon: <CloudUploadOutlined />, adminOnly: true },
   { key: 'seguridad', path: '/seguridad', label: 'Seguridad', icon: <SafetyOutlined /> },
 ];
 

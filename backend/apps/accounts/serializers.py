@@ -1,7 +1,19 @@
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
-from .models import Rol, Usuario, UsuarioRol
+from .models import Empleado, Rol, Usuario, UsuarioRol
+
+
+class EmpleadoSerializer(serializers.ModelSerializer):
+    tiene_usuario = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Empleado
+        fields = ['id', 'nombre_completo', 'cargo', 'correo', 'activo', 'tiene_usuario', 'creado_en', 'actualizado_en']
+        read_only_fields = ['id', 'creado_en', 'actualizado_en']
+
+    def get_tiene_usuario(self, obj):
+        return hasattr(obj, 'usuario') and obj.usuario is not None
 
 
 class RolSerializer(serializers.ModelSerializer):

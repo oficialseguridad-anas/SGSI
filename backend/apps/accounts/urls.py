@@ -7,8 +7,11 @@ from .views import (
     CambiarPasswordView,
     ConfirmarRecuperacionPasswordView,
     Desactivar2FAView,
+    EmpleadoViewSet,
     EnviarCodigoEmailActivacionView,
+    ImportarEmpleadosView,
     MeView,
+    PlantillaEmpleadosView,
     ReenviarCodigoOtpView,
     RolViewSet,
     Setup2FAView,
@@ -22,6 +25,7 @@ from .views import (
 )
 
 router = DefaultRouter()
+router.register('empleados', EmpleadoViewSet, basename='empleado')
 router.register('usuarios', UsuarioViewSet, basename='usuario')
 router.register('roles', RolViewSet, basename='rol')
 router.register('usuario-roles', UsuarioRolViewSet, basename='usuariorol')
@@ -45,5 +49,7 @@ urlpatterns = [
     path('auth/2fa/email/enviar/', EnviarCodigoEmailActivacionView.as_view(), name='2fa_email_enviar'),
     path('auth/2fa/email/activar/', ActivarEmailOtpView.as_view(), name='2fa_email_activar'),
     path('auth/2fa/desactivar/', Desactivar2FAView.as_view(), name='2fa_desactivar'),
+    path('empleados-plantilla/', PlantillaEmpleadosView.as_view(), name='empleados_plantilla'),
+    path('empleados-importar/', ImportarEmpleadosView.as_view(), name='empleados_importar'),
     path('', include(router.urls)),
 ]

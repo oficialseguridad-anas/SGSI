@@ -103,3 +103,66 @@ class SeguimientoHallazgoAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
         for archivo in form.cleaned_data.get('archivos_nuevos') or []:
             ArchivoAdjuntoSeguimiento.objects.create(seguimiento=obj, archivo=archivo)
+
+
+from .models import (
+    Auditoria,
+    ItemVerificacionAuditoria,
+    MatrizPriorizacionAuditoria,
+    OportunidadPlanAuditoria,
+    ProgramaAuditoria,
+    RiesgoPlanAuditoria,
+    SesionAuditoria,
+)
+
+
+@admin.register(MatrizPriorizacionAuditoria)
+class MatrizPriorizacionAuditoriaAdmin(admin.ModelAdmin):
+    list_display = ['proceso', 'anio', 'puntaje_final', 'prioridad']
+    list_filter = ['anio']
+    autocomplete_fields = ['proceso']
+    search_fields = ['proceso__nombre']
+
+
+@admin.register(ProgramaAuditoria)
+class ProgramaAuditoriaAdmin(admin.ModelAdmin):
+    list_display = ['anio', 'tipo', 'proceso', 'auditado', 'auditor_lider', 'get_mes_planeado_display']
+    list_filter = ['anio', 'tipo']
+    autocomplete_fields = ['proceso', 'auditor_lider']
+    search_fields = ['proceso__nombre', 'auditado', 'procedimiento']
+
+    @admin.display(description='Mes planeado')
+    def get_mes_planeado_display(self, obj):
+        return obj.get_mes_planeado_display() if obj.mes_planeado else '—'
+
+
+class RiesgoPlanAuditoriaInline(admin.TabularInline):
+    model = RiesgoPlanAuditoria
+    extra = 0
+
+
+class OportunidadPlanAuditoriaInline(admin.TabularInline):
+    model = OportunidadPlanAuditoria
+    extra = 0
+
+
+class SesionAuditoriaInline(admin.TabularInline):
+    model = SesionAuditoria
+    extra = 0
+
+
+@admin.register(Auditoria)
+class AuditoriaAdmin(admin.ModelAdmin):
+    list_display = ['codigo', 'tipo', 'estado', 'auditor_lider', 'fecha_auditoria']
+    list_filter = ['tipo', 'estado']
+    search_fields = ['codigo', 'objetivo', 'alcance']
+    autocomplete_fields = ['programa', 'auditor_lider', 'equipo_auditor', 'aprobado_por']
+    inlines = [RiesgoPlanAuditoriaInline, OportunidadPlanAuditoriaInline, SesionAuditoriaInline]
+
+
+@admin.register(ItemVerificacionAuditoria)
+class ItemVerificacionAuditoriaAdmin(admin.ModelAdmin):
+    list_display = ['auditoria', 'etapa', 'tipo_hallazgo', 'descripcion_elemento']
+    list_filter = ['etapa', 'tipo_hallazgo']
+    autocomplete_fields = ['auditoria', 'hallazgo_generado']
+    search_fields = ['descripcion_elemento', 'descripcion_hallazgo']

@@ -1,7 +1,8 @@
 from django.conf import settings
+from django.http import HttpResponse
 from rest_framework import status, viewsets
-from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
+from rest_framework.permissions import AllowAny, DjangoModelPermissions, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
@@ -12,7 +13,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from . import otp as otp_utils
-from .models import BitacoraAcceso, Rol, Usuario, UsuarioRol
+from .excel_empleados import generar_plantilla_empleados_xlsx, importar_empleados_desde_xlsx
+from .models import BitacoraAcceso, Empleado, Rol, Usuario, UsuarioRol
 from .permissions import EsAdministrador, PuedeVerUsuarios
 from .serializers import (
     Activar2FASerializer,
@@ -20,6 +22,7 @@ from .serializers import (
     CambiarPasswordSerializer,
     ConfirmarRecuperacionPasswordSerializer,
     Desactivar2FASerializer,
+    EmpleadoSerializer,
     MeSerializer,
     ReenviarCodigoOtpSerializer,
     RolSerializer,
@@ -407,6 +410,53 @@ class UsuarioViewSet(viewsets.ModelViewSet):
                 {'detail': 'No puedes eliminar tu propio usuario.'}, status=status.HTTP_400_BAD_REQUEST
             )
         return super().destroy(request, *args, **kwargs)
+
+
+class EmpleadoViewSet(viewsets.ModelViewSet):
+    """Directorio de personas — abierto a cualquier usuario autenticado con el permiso
+    normal del modelo (no solo administradores), porque cualquier módulo puede necesitar
+    agregar una persona nueva como responsable/revisor/asistente al vuelo."""
+
+    queryset = Empleado.objects.select_related('usuario').all()
+    serializer_class = EmpleadoSerializer
+    permission_classes = [IsAuthenticated, DjangoModelPermissions]
+    filterset_fields = ['activo']
+    search_fields = ['nombre_completo', 'cargo', 'correo']
+
+
+class PlantillaEmpleadosView(APIView):
+    """Descarga la plantilla en blanco para cargar empleados por lote."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        buffer = generar_plantilla_empleados_xlsx()
+        respuesta = HttpResponse(
+            buffer.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        respuesta['Content-Disposition'] = 'attachment; filename="Plantilla_Empleados.xlsx"'
+        return respuesta
+
+
+class ImportarEmpleadosView(APIView):
+    """Carga masiva de empleados desde la plantilla diligenciada. Empareja por correo
+    o por nombre completo exacto para actualizar en vez de duplicar si se reimporta el
+    mismo archivo (ej. corrigiendo un cargo)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not request.user.has_perm('accounts.add_empleado'):
+            raise PermissionDenied('No tienes permiso para agregar empleados.')
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            raise ValidationError({'archivo': 'Adjunta el archivo .xlsx diligenciado.'})
+        try:
+            resumen = importar_empleados_desde_xlsx(archivo)
+        except Exception as error:  # noqa: BLE001 - cualquier archivo mal formado debe dar un error legible, no un 500
+            raise ValidationError({'archivo': f'No se pudo leer el archivo: {error}'})
+        return Response(resumen, status=status.HTTP_200_OK)
 
 
 class RolViewSet(viewsets.ModelViewSet):
