@@ -652,6 +652,214 @@ Stop-Process -Id <ese_numero> -Force
     `oxlint` sobre los archivos tocados, sin errores (los warnings de
     `exhaustive-deps` en `hallazgos`/`todasLasFilas` son preexistentes, no
     introducidos por este cambio).
+- **Corrección estructural de la Lista de Verificación de AUD-2025-001
+  (2026-09-24)**: el usuario notó, viendo el módulo, que "Requisitos legales
+  A.5.31", "5.2", "A5.3", etc. aparecían como "elementos a revisar" propios
+  en vez de quedar agrupados bajo el tema real (ej. "Contexto",
+  "Liderazgo") — pidió que la estructura respetara tal cual el Excel real
+  (FO-860-25). Sugirió también usar el Informe (FO-860-22) como base
+  alternativa; se le explicó y aceptó por qué no aplica: el Informe resume
+  por **proceso** (12 procesos, ~1-3 viñetas narrativas cada uno, ~40
+  entradas en total — verificado abriendo el archivo real), mientras la
+  Lista de Verificación es el detalle fila por fila (119 items) — no hay
+  correspondencia 1 a 1 reconstruible entre ambos sin inventar un
+  emparejamiento impreciso, el mismo riesgo de fuzzy matching ya evitado
+  antes en esta sesión.
+  - **Causa raíz real, confirmada leyendo el código fuente de la migración
+    0015** (`ITEMS_CHECKLIST`, la lista literal de 119 tuplas): en el Excel
+    real, la columna "Descripción del elemento a revisar" usa celdas
+    combinadas D:H cuando un mismo tema tiene varias filas de evaluación
+    debajo (ej. `D13:H15` = "Contexto" cubre 3 filas). La extracción
+    original, al toparse con esas celdas vacías en las filas 2ª/3ª del
+    grupo, tomó por error el valor de la columna "Otros Requisito" (J) de
+    esa fila como si fuera un elemento nuevo.
+  - Migración `0021_corregir_elemento_checklist_2025.py`: se releyó el
+    Excel real respetando sus 12 hojas (una por sesión/tema) y sus merges
+    D:H, y se comparó fila por fila contra el orden exacto de
+    `ITEMS_CHECKLIST` de la migración 0015 (usando `tipo_hallazgo` +
+    `descripcion_hallazgo` como huella para verificar que la alineación
+    posicional fuera exacta antes de confiar en la corrección — los 119
+    items de ambas fuentes coincidieron 1 a 1 sin ambigüedad, y los conteos
+    por hoja/sesión coincidieron exactamente). Corrigió 95 de los 119 items
+    (`descripcion_elemento` únicamente — no se tocó `requisito_iso`,
+    `tipo_hallazgo`, `descripcion_hallazgo`, `sesion` ni `hallazgo_generado`;
+    los 9 items ya vinculados a H-001/H-002/H-003 conservaron su vínculo).
+  - **Decisión de diseño explícita**: dentro de varios grupos, el propio
+    Excel deja la celda de "elemento a revisar" en blanco para las filas
+    siguientes a la primera (el auditor no repitió el encabezado para cada
+    control individual del Anexo A) — en vez de dejar `descripcion_elemento`
+    vacío (lo más literal), se heredó (forward-fill) el último encabezado no
+    vacío dentro de la misma hoja, para cumplir lo pedido explícitamente por
+    el usuario ("si evaluaron varios aspectos del contexto, quede dentro del
+    mismo"). Los encabezados heredados resultantes coinciden exactamente con
+    los 12 nombres de proceso del Informe real (FO-860-22) — corrobora que
+    la agrupación quedó correcta, no inventada.
+  - Verificado con una comparación automática post-migración (119 items,
+    0 diferencias contra la reconstrucción esperada) y una consulta directa
+    a los 9 items con `hallazgo_generado` para confirmar que sus vínculos no
+    se alteraron.
+  - **Tabla del checklist con celdas fusionadas (2026-09-24, mismo día, a
+    pedido del usuario)**: una vez agrupados los 119 items correctamente,
+    pidió que la tabla de `AuditoriaDetalleDrawer.tsx` (pestaña "Lista de
+    verificación") se viera como el Excel real — filas consecutivas con la
+    misma Etapa + Elemento a revisar fusionadas en una sola celda
+    (`rowSpan`, calculado por adyacencia ya que `items_verificacion` viene
+    ordenado por `id` = orden original de las filas del Excel), sin tocar
+    los demás campos (cada fila conserva su propio Requisito ISO, Tipo de
+    hallazgo, botón Generar hallazgo/Editar/Eliminar). Además pidió quitar
+    la expansión con "+" y dejar la columna **"Descripción del hallazgo"**
+    siempre visible en la tabla — se agregó como columna real (entre Tipo de
+    hallazgo y Hallazgo) y se eliminó el `expandable`/`expandedRowRender`
+    que antes la escondía junto con "Otros requisitos" (ese campo sigue
+    editable desde el modal "Editar", solo dejó de mostrarse en la tabla —
+    en los datos reales está vacío en todos los items).
+  - **Sub-pestañas por sesión (mismo día, a pedido del usuario: "puede
+    dividir por pestañas así como se encuentra el archivo excel")**: dentro
+    de la pestaña "Lista de verificación", los 119 items ahora se dividen en
+    sub-pestañas (una `Tabs` anidada), replicando las 12 hojas del Excel
+    real. La agrupación **no mapea nombres de hoja a mano** — agrupa
+    dinámicamente por `item.sesion` en el mismo orden en que aparecen los
+    items (que ya vienen ordenados por `id`, o sea, en el orden original de
+    las filas del Excel), así que el orden de las sub-pestañas coincide con
+    el orden real de las hojas sin mantenimiento adicional. Los 22 items sin
+    `sesion` (la hoja "Sedes", que cubre dos visitas a la vez) quedan en su
+    propia sub-pestaña "Sedes (sin sesión asociada)", en la posición exacta
+    donde aparecían en el Excel (entre Infraestructura y Desarrollo). El
+    `rowSpan` de Etapa/Elemento a revisar ahora se calcula por sub-pestaña
+    (cada `Table` recibe solo los items de su sesión), no sobre la lista
+    completa.
+  - **Asignar un hallazgo ya existente (mismo día, a pedido del usuario)**:
+    la columna "Hallazgo" solo permitía "Generar hallazgo" (crear uno
+    nuevo). Se agregó un botón **"Asignar existente"** (o "Cambiar" si el
+    item ya tiene uno) que abre un modal con un `Select` buscable sobre
+    TODOS los hallazgos del sistema (`fetchHallazgos`, de
+    `features/auditorias/api.ts` — no se restringe a los de esta auditoría,
+    ya que el caso de uso es justamente relacionar hallazgos históricos de
+    cualquier año) y guarda con `vincularItemAHallazgo` (el mismo endpoint
+    `PATCH /items-verificacion-auditoria/:id/ {hallazgo_generado}` ya usado
+    por `RelacionarChecklistModal` — sin cambios de backend). El `Select`
+    permite dejarlo vacío para quitar la relación. Probado end-to-end
+    (asignar un hallazgo de otra auditoría/año → 200, `hallazgo_generado_
+    codigo` refleja el cambio → revertir a `null` → 200) contra la API
+    real.
+  - **Mostrar el tratamiento (seguimiento) de cada hallazgo en el selector
+    (mismo día, a pedido del usuario)**: al elegir un hallazgo ya existente
+    para asignar, ahora cada opción muestra también un Tag con su estado
+    (mismos colores que el módulo de Hallazgos) y, debajo, el texto de la(s)
+    `accion_correctiva` de sus seguimientos ya registrados (`Hallazgo.
+    seguimientos`, ya venía en el payload de `fetchHallazgos` — no
+    requirió cambios de backend) — así se puede identificar el hallazgo
+    correcto sin salir del modal a consultarlo en otro lado. La búsqueda
+    (`filterOption`) también matchea contra ese texto de tratamiento, no
+    solo contra código/descripción.
+  - **Panel de tratamiento + relaciones existentes dentro del mismo modal
+    (mismo día, a pedido del usuario)**: debajo del selector, cuando hay un
+    hallazgo elegido (ya asignado o recién seleccionado en el propio
+    `Select`, antes de guardar), aparece un panel con: su estado + código +
+    descripción; la lista de sus **seguimientos/tratamientos** (acción
+    correctiva + tag de verificación de eficacia) con botón **"Editar"** por
+    cada uno y **"+ Agregar seguimiento"** — ambos abren
+    `SeguimientoFormModal` (reutilizado tal cual del módulo de Hallazgos,
+    como modal anidado sobre este) para gestionar el tratamiento sin salir
+    de la Lista de Verificación.
+    - **Primera versión (solo lectura) corregida el mismo día**: la lista de
+      "otros items ya relacionados" nació de solo lectura y, en items sin
+      hallazgo asignado todavía, ese espacio del modal se veía vacío — el
+      usuario aclaró (con una pregunta directa, `AskUserQuestion`) que
+      quería poder **agregar y quitar** esas relaciones desde ahí, no solo
+      verlas. Se reemplazó por un `Select mode="multiple"` ("Items del
+      checklist relacionados con este hallazgo"): al elegir un hallazgo
+      (arriba) se precarga con TODOS los items de CUALQUIER sesión ya
+      vinculados a ese hallazgo más el item actual (forzado a entrar), y el
+      usuario marca/desmarca libremente. Al guardar, se calcula el diff
+      contra el estado real en `itemsChecklist` y se aplica con
+      `vincularItemAHallazgo` por item (igual mecanismo que
+      `RelacionarChecklistModal`, pero ahora también accesible desde el
+      lado del checklist, no solo desde Hallazgos). Las opciones excluyen
+      Fortaleza/Conformidad y los items ya vinculados a OTRO hallazgo
+      distinto (mismos criterios que `RelacionarChecklistModal`, por
+      consistencia). Si se limpia el `Select` de hallazgo por completo, el
+      guardado solo desvincula el item actual (comportamiento original,
+      sin tocar otros items). No requirió cambios de backend: reutiliza
+      `vincularItemAHallazgo`, `SeguimientoFormModal` y los datos que ya
+      trae `fetchHallazgos`/`fetchAuditoria` (`items_verificacion` ya viene
+      completo con todas las sesiones en el payload de la auditoría).
+    - **Sugerencias antes de elegir nada (mismo día, a pedido del
+      usuario)**: si el item que se está por asignar no tiene hallazgo
+      propio pero OTRAS filas del mismo "elemento a revisar" (mismo `etapa`
+      + `descripcion_elemento` — las que quedan fusionadas visualmente en
+      la tabla, ej. las 3 filas de "Contexto") ya están relacionadas con
+      algún hallazgo, se muestra una sección **"Hallazgos ya relacionados
+      con '<elemento>'"** arriba del selector, con un botón **"Usar
+      este"** por cada uno (reutiliza `cambiarHallazgoSeleccionado`, la
+      misma función que dispara el selector, para no duplicar lógica) —
+      así no hay que buscarlo de nuevo si ya aplica al mismo tema. No
+      aparece nada si ninguna fila hermana tiene hallazgo todavía.
+  - **Ocultar "Generar hallazgo"/"Asignar existente" en Fortaleza y
+    Conformidad (mismo día, a pedido del usuario, con captura mostrando
+    ambos botones en filas de ese tipo)**: la columna "Hallazgo" de la
+    tabla del checklist (`AuditoriaDetalleDrawer.tsx`) ya excluía
+    Conformidad solo del botón "Generar hallazgo"; ahora ambos botones
+    ("Generar hallazgo" y "Asignar existente"/"Cambiar") solo aparecen si
+    `tipo_hallazgo` es `NO_CONFORMIDAD` u `OPORTUNIDAD_MEJORA` — ni
+    Fortaleza ni Conformidad los muestran, mismo criterio ya aplicado en
+    `RelacionarChecklistModal` y en el multi-select de "Items relacionados"
+    del modal "Asignar hallazgo".
+  - **Botón/título "Editar hallazgo" cuando ya hay uno asignado (mismo día,
+    a pedido del usuario)**: el botón que antes decía "Cambiar" para un
+    item ya vinculado ahora dice **"Editar hallazgo"** (más claro sobre lo
+    que realmente permite hacer: ver el hallazgo relacionado, su
+    tratamiento, y agregar/quitar relaciones — no solo reemplazarlo). El
+    título del modal también cambia dinámicamente a "Editar hallazgo —
+    \<elemento>" en ese caso (vs. "Asignar hallazgo — \<elemento>" cuando el
+    item todavía no tiene ninguno). No cambió la funcionalidad interna —ya
+    existía desde la iteración anterior—, solo el nombrado para que sea
+    más claro qué hace cada botón.
+- **Bug real encontrado y corregido: el multi-select de "otros items" podía
+  desvincular por accidente al propio item que se estaba editando
+  (2026-09-24)**: el usuario reportó que el item 40 ("a8.2 acceso
+  privilegiado", ya vinculado a H-001 desde antes) apareció mostrando
+  "Asignar existente" en vez de "Editar hallazgo" — se verificó en la BD que
+  efectivamente su `hallazgo_generado_id` había quedado en `NULL`. Causa
+  raíz: el multi-select "Items del checklist relacionados con este
+  hallazgo" incluía al propio item actual como una opción más,
+  indistinguible del resto — bastaba con desmarcarlo ahí (sin querer, al
+  buscar/filtrar entre muchos items) para que el guardado lo desvinculara,
+  ya que su vínculo se manejaba únicamente a través de ese diff.
+  - **Corrección de diseño**: el vínculo del item que se está
+    asignando/editando ahora se guarda **siempre explícitamente** según el
+    selector de arriba (`hallazgoSeleccionado`), sin pasar por el
+    multi-select. El multi-select (renombrado a "**Otros** items del
+    checklist relacionados con este hallazgo") **excluye por completo** al
+    item actual de sus opciones — solo gestiona relaciones de items
+    distintos. `itemsVinculadosA(hallazgoId, excluirId)` ahora exige
+    explícitamente el id a excluir, para que no se pueda repetir este error
+    si se reutiliza la función en otro lado.
+  - **Dato real corregido**: se restauró a mano el vínculo de `id=40` →
+    `H-001` (`ItemVerificacionAuditoria.objects.get(id=40).hallazgo_generado
+    = Hallazgo.objects.get(codigo='H-001')`), verificado con
+    `refresh_from_db()`.
+- **Barra de sub-pestañas de sesión con flechas para desplazar
+  (2026-09-24, a pedido del usuario)**: con 12 sub-pestañas (una por
+  sesión/hoja del Excel), el `<Tabs>` de antd las colapsaba detrás de un
+  "..." al no caber — **antd v6 (`@rc-component/tabs`) no tiene flechas de
+  desplazamiento nativas, solo ese menú "más"** (confirmado leyendo su
+  código fuente en `node_modules`, no asumido) y su scroll interno usa
+  `transform: translate()` con estado propio, no `scrollLeft` nativo, así
+  que no se puede controlar por fuera con un simple `ref.scrollBy(...)`.
+  Se reemplazó la sub-barra de pestañas del checklist (dentro de
+  `tabChecklist`, `AuditoriaDetalleDrawer.tsx`) por una implementación
+  **100% propia**: botones `<button>` planos dentro de un `div` con
+  `overflowX: auto` (scroll nativo real, con inercia/touch/rueda del
+  mouse funcionando gratis), flanqueado por dos `Button` de antd con
+  `LeftOutlined`/`RightOutlined` que llaman `scrollRef.current.scrollBy({
+  left: ±240, behavior: 'smooth' })`. El estado de pestaña activa
+  (`checklistTabActivo`) y el render de la tabla del grupo activo se
+  maneja directamente (ya no usa el componente `Tabs` de antd para esta
+  sub-barra en particular — el `Tabs` principal del Drawer, con Plan de
+  auditoría/Cronograma/Lista de verificación, no se tocó). Estilo visual
+  replicado a mano (subrayado + color `BRAND.tealDark` en la pestaña
+  activa) para mantener la misma apariencia que el resto de la app.
 
 ### Backups automáticos (SQL Server + media)
 - Motivo: item #2 🔴 Crítico de la sección 0. La base de datos vive en un
@@ -1081,6 +1289,28 @@ Stop-Process -Id <ese_numero> -Force
   la página (`HallazgosPage.tsx`) no cambiaron, solo su ubicación en el
   menú lateral — sigue viviendo en `features/auditorias/`, no se movió de
   carpeta.
+- **Edición de items de la Lista de Verificación** (2026-09-24, a pedido del
+  usuario: "necesito tener la opción de editar estos campos... a la hora de
+  hacer la migración algunos datos quedaron incompletos" — se refería a
+  `otros_requisitos`/`descripcion_hallazgo` de la carga real de la migración
+  0015, algunos vacíos o truncados en el Excel original). Antes solo se
+  podía "Generar hallazgo" o "Eliminar" cada fila del checklist en
+  `AuditoriaDetalleDrawer.tsx` — no había forma de corregir un dato ya
+  cargado sin borrar la fila entera. Se agregó botón **"Editar"** (columna
+  de acciones, junto a "Eliminar") que abre un `Modal` con los mismos
+  campos del formulario de "Agregar item" (sesión, etapa, requisito ISO,
+  tipo de hallazgo, descripción del elemento, descripción del hallazgo) más
+  **"Otros requisitos"** (que el formulario de alta nunca tuvo como campo
+  editable, solo se podía fijar por carga masiva) — todos precargados con
+  los valores actuales del item. Guarda con `actualizarItemVerificacion`
+  (`PATCH /items-verificacion-auditoria/:id/`, ya existía en `api.ts`, no
+  se tocó backend). Respeta el mismo `puedeEditar` que el resto de la
+  pestaña (bloqueado si la auditoría está `CERRADA` y el usuario no es
+  administrador). Probado end-to-end contra la API real
+  (`APIRequestFactory` + `force_authenticate`): PATCH de
+  `otros_requisitos`/`descripcion_hallazgo`/`requisito_iso` sobre un item
+  real de AUD-2025-001 → 200, valores reflejados, y reversión a los
+  originales confirmada.
 
 ### Usuarios
 - El campo "Área" fue reemplazado por "Dirección" (FK, `Dirección 1 — N

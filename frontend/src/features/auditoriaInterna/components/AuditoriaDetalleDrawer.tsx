@@ -1,4 +1,4 @@
-import { CheckOutlined, DownloadOutlined, PlusOutlined, UnlockOutlined } from '@ant-design/icons';
+import { CheckOutlined, DownloadOutlined, LeftOutlined, PlusOutlined, RightOutlined, UnlockOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Button,
@@ -8,6 +8,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Modal,
   Popconfirm,
   Select,
   Skeleton,
@@ -20,13 +21,18 @@ import {
   message,
 } from 'antd';
 import dayjs from 'dayjs';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../../../app/AuthContext';
 import { BRAND } from '../../../shared/theme/brand';
 import { fetchEmpleados } from '../../accounts/api';
 import { fetchProcesos } from '../../activos/api';
+import { fetchHallazgos } from '../../auditorias/api';
+import { SeguimientoFormModal } from '../../auditorias/components/SeguimientoFormModal';
+import { COLOR_ESTADO_HALLAZGO, NOMBRE_ESTADO_HALLAZGO, TEXTO_ESTADO_HALLAZGO } from '../../auditorias/estadoHallazgo';
+import type { EstadoHallazgo, Hallazgo, SeguimientoHallazgo } from '../../auditorias/types';
 import {
   actualizarAuditoria,
+  actualizarItemVerificacion,
   crearItemVerificacion,
   crearOportunidadPlan,
   crearRiesgoPlan,
@@ -38,6 +44,7 @@ import {
   eliminarSesionAuditoria,
   fetchAuditoria,
   generarHallazgoDesdeItem,
+  vincularItemAHallazgo,
 } from '../api';
 import type { EstadoAuditoria, ItemVerificacionAuditoria, SesionAuditoria } from '../types';
 
@@ -69,6 +76,18 @@ const COLOR_TIPO_HALLAZGO: Record<string, string> = {
   FORTALEZA: 'blue',
 };
 const ETIQUETA_ETAPA: Record<string, string> = { P: 'Planear', H: 'Hacer', V: 'Verificar', A: 'Actuar' };
+const COLOR_VERIFICACION: Record<SeguimientoHallazgo['verificacion_eficacia'], string> = {
+  EFICAZ: 'green',
+  PARCIALMENTE_EFICAZ: 'gold',
+  INEFICAZ: 'red',
+  NO_IMPLEMENTADO: 'default',
+};
+const NOMBRE_VERIFICACION: Record<SeguimientoHallazgo['verificacion_eficacia'], string> = {
+  EFICAZ: 'Eficaz',
+  PARCIALMENTE_EFICAZ: 'Parcialmente Eficaz',
+  INEFICAZ: 'Ineficaz (No Cumple)',
+  NO_IMPLEMENTADO: 'No Implementado',
+};
 
 function TituloSeccion({ children }: { children: React.ReactNode }) {
   return (
@@ -110,12 +129,30 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
     sesion: number | undefined; etapa: string | undefined; descripcion_elemento: string; requisito_iso: string;
     otros_requisitos: string; tipo_hallazgo: string | undefined; descripcion_hallazgo: string;
   }>({ sesion: undefined, etapa: undefined, descripcion_elemento: '', requisito_iso: '', otros_requisitos: '', tipo_hallazgo: undefined, descripcion_hallazgo: '' });
+  const [itemEditando, setItemEditando] = useState<ItemVerificacionAuditoria | null>(null);
+  const [itemEditValores, setItemEditValores] = useState<{
+    sesion: number | undefined; etapa: string | undefined; descripcion_elemento: string; requisito_iso: string;
+    otros_requisitos: string; tipo_hallazgo: string | undefined; descripcion_hallazgo: string;
+  }>({ sesion: undefined, etapa: undefined, descripcion_elemento: '', requisito_iso: '', otros_requisitos: '', tipo_hallazgo: undefined, descripcion_hallazgo: '' });
+  const [itemParaAsignar, setItemParaAsignar] = useState<ItemVerificacionAuditoria | null>(null);
+  const [hallazgoSeleccionado, setHallazgoSeleccionado] = useState<number | undefined>(undefined);
+  const [itemsSeleccionadosParaHallazgo, setItemsSeleccionadosParaHallazgo] = useState<number[]>([]);
+  const [seguimientoFormAbierto, setSeguimientoFormAbierto] = useState(false);
+  const [seguimientoEditando, setSeguimientoEditando] = useState<SeguimientoHallazgo | null>(null);
+  const [checklistTabActivo, setChecklistTabActivo] = useState<string | undefined>(undefined);
+  const checklistScrollRef = useRef<HTMLDivElement>(null);
 
   const { data: auditoria, isLoading } = useQuery({
     queryKey: ['auditoria', auditoriaId],
     queryFn: () => fetchAuditoria(auditoriaId!),
     enabled: auditoriaId !== null,
   });
+  const { data: hallazgosData } = useQuery({
+    queryKey: ['hallazgos'],
+    queryFn: fetchHallazgos,
+    enabled: auditoriaId !== null,
+  });
+  const itemsChecklist = auditoria?.items_verificacion ?? [];
   const { data: empleadosData } = useQuery({ queryKey: ['empleados'], queryFn: fetchEmpleados, enabled: auditoriaId !== null });
   const { data: procesosData } = useQuery({ queryKey: ['procesos'], queryFn: fetchProcesos, enabled: auditoriaId !== null });
 
@@ -207,6 +244,24 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
     onError: () => message.error('No se pudo agregar el item.'),
   });
   const eliminarItemMutation = useMutation({ mutationFn: eliminarItemVerificacion, onSuccess: invalidar });
+  const actualizarItemMutation = useMutation({
+    mutationFn: () =>
+      actualizarItemVerificacion(itemEditando!.id, {
+        sesion: itemEditValores.sesion ?? null,
+        etapa: (itemEditValores.etapa as ItemVerificacionAuditoria['etapa']) ?? '',
+        descripcion_elemento: itemEditValores.descripcion_elemento,
+        requisito_iso: itemEditValores.requisito_iso,
+        otros_requisitos: itemEditValores.otros_requisitos,
+        tipo_hallazgo: (itemEditValores.tipo_hallazgo as ItemVerificacionAuditoria['tipo_hallazgo']) ?? '',
+        descripcion_hallazgo: itemEditValores.descripcion_hallazgo,
+      }),
+    onSuccess: () => {
+      message.success('Item actualizado.');
+      setItemEditando(null);
+      invalidar();
+    },
+    onError: () => message.error('No se pudo actualizar el item.'),
+  });
   const generarHallazgoMutation = useMutation({
     mutationFn: generarHallazgoDesdeItem,
     onSuccess: (item) => {
@@ -214,6 +269,32 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
       invalidar();
     },
     onError: () => message.error('No se pudo generar el hallazgo — verifica que el tipo no sea Conformidad.'),
+  });
+  const asignarHallazgoMutation = useMutation({
+    mutationFn: async () => {
+      const item = itemParaAsignar!;
+      const promesas: Promise<unknown>[] = [];
+      // El vínculo del propio item siempre se guarda explícitamente (según el
+      // selector de arriba), sin depender del multi-select de "otros items".
+      if (item.hallazgo_generado !== (hallazgoSeleccionado ?? null)) {
+        promesas.push(vincularItemAHallazgo(item.id, hallazgoSeleccionado ?? null));
+      }
+      if (hallazgoSeleccionado) {
+        const yaVinculados = itemsVinculadosA(hallazgoSeleccionado, item.id);
+        const aVincular = itemsSeleccionadosParaHallazgo.filter((id) => !yaVinculados.includes(id));
+        const aDesvincular = yaVinculados.filter((id) => !itemsSeleccionadosParaHallazgo.includes(id));
+        promesas.push(...aVincular.map((id) => vincularItemAHallazgo(id, hallazgoSeleccionado)));
+        promesas.push(...aDesvincular.map((id) => vincularItemAHallazgo(id, null)));
+      }
+      await Promise.all(promesas);
+    },
+    onSuccess: () => {
+      message.success('Relación con el hallazgo actualizada.');
+      setItemParaAsignar(null);
+      invalidar();
+      queryClient.invalidateQueries({ queryKey: ['hallazgos'] });
+    },
+    onError: () => message.error('No se pudo actualizar la relación.'),
   });
 
   async function descargarXlsx() {
@@ -274,6 +355,72 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
       descripcion_hallazgo: nuevoItem.descripcion_hallazgo,
     });
   }
+
+  function abrirEditarItem(item: ItemVerificacionAuditoria) {
+    setItemEditando(item);
+    setItemEditValores({
+      sesion: item.sesion ?? undefined,
+      etapa: item.etapa || undefined,
+      descripcion_elemento: item.descripcion_elemento,
+      requisito_iso: item.requisito_iso,
+      otros_requisitos: item.otros_requisitos,
+      tipo_hallazgo: item.tipo_hallazgo || undefined,
+      descripcion_hallazgo: item.descripcion_hallazgo,
+    });
+  }
+
+  // Excluye siempre el item que se está asignando/editando: su propia relación la
+  // maneja el selector de arriba (hallazgoSeleccionado), no el multi-select de "otros
+  // items" — así no puede desvincularse a sí mismo por accidente al tildar/destildar
+  // en una lista larga (bug real detectado: un item que sí tenía hallazgo terminó sin
+  // él porque el multi-select lo incluía como una opción más, indistinguible del
+  // resto).
+  function itemsVinculadosA(hallazgoId: number, excluirId: number) {
+    return itemsChecklist.filter((it) => it.hallazgo_generado === hallazgoId && it.id !== excluirId).map((it) => it.id);
+  }
+
+  function abrirAsignarExistente(item: ItemVerificacionAuditoria) {
+    setItemParaAsignar(item);
+    const hallazgoActual = item.hallazgo_generado ?? undefined;
+    setHallazgoSeleccionado(hallazgoActual);
+    setItemsSeleccionadosParaHallazgo(hallazgoActual ? itemsVinculadosA(hallazgoActual, item.id) : []);
+  }
+
+  function cambiarHallazgoSeleccionado(valor: number | undefined) {
+    setHallazgoSeleccionado(valor);
+    if (!valor || !itemParaAsignar) {
+      setItemsSeleccionadosParaHallazgo([]);
+      return;
+    }
+    setItemsSeleccionadosParaHallazgo(itemsVinculadosA(valor, itemParaAsignar.id));
+  }
+
+  function abrirGestionSeguimiento(seguimiento: SeguimientoHallazgo | null) {
+    setSeguimientoEditando(seguimiento);
+    setSeguimientoFormAbierto(true);
+  }
+
+  const hallazgoAsignado = hallazgosData?.results.find((h) => h.id === hallazgoSeleccionado);
+
+  // Antes de elegir nada en el selector: si otras filas del MISMO elemento a revisar
+  // (mismo etapa + descripcion_elemento — las que quedan fusionadas visualmente en la
+  // tabla) ya están relacionadas con algún hallazgo, se sugieren aquí para reutilizar
+  // con un clic, en vez de tener que buscarlo de nuevo.
+  const idsHallazgosSugeridos = itemParaAsignar
+    ? Array.from(new Set(
+        itemsChecklist
+          .filter((it) =>
+            it.id !== itemParaAsignar.id
+            && it.etapa === itemParaAsignar.etapa
+            && it.descripcion_elemento === itemParaAsignar.descripcion_elemento
+            && it.hallazgo_generado !== null,
+          )
+          .map((it) => it.hallazgo_generado as number),
+      ))
+    : [];
+  const hallazgosSugeridos = idsHallazgosSugeridos
+    .map((id) => hallazgosData?.results.find((h) => h.id === id))
+    .filter((h): h is Hallazgo => h !== undefined && h.id !== hallazgoSeleccionado);
 
   const opcionesEmpleados = (empleadosData?.results ?? []).map((e) => ({
     value: e.id,
@@ -449,56 +596,159 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
     label: `${s.fecha ?? 'sin fecha'} — ${s.proceso_nombre ?? s.procedimiento ?? 'sin proceso'}`,
   }));
 
+  // Agrupa por sesión, en el mismo orden en que aparecen los items (ordenados por
+  // id = orden original de las filas del Excel) — así los grupos quedan en el mismo
+  // orden de las hojas del archivo real, sin necesidad de mapear nombres a mano. Los
+  // items sin sesión (la hoja "Sedes", que cubre dos visitas a la vez) quedan en su
+  // propio grupo, en la posición donde realmente aparecían en el Excel.
+  const gruposChecklist: { clave: string; titulo: string; items: ItemVerificacionAuditoria[] }[] = [];
+  const indicePorClave = new Map<string, number>();
+  for (const item of itemsChecklist) {
+    const clave = item.sesion !== null ? String(item.sesion) : 'sin-sesion';
+    if (!indicePorClave.has(clave)) {
+      const sesionInfo = item.sesion !== null ? auditoria?.sesiones.find((s) => s.id === item.sesion) : undefined;
+      const titulo = sesionInfo ? (sesionInfo.tema || sesionInfo.proceso_nombre || `Sesión ${sesionInfo.id}`) : 'Sedes (sin sesión asociada)';
+      indicePorClave.set(clave, gruposChecklist.length);
+      gruposChecklist.push({ clave, titulo, items: [] });
+    }
+    gruposChecklist[indicePorClave.get(clave)!].items.push(item);
+  }
+
+  function columnasChecklist(items: ItemVerificacionAuditoria[]) {
+    // Filas consecutivas con la misma etapa + elemento a revisar se fusionan
+    // visualmente en una sola celda (rowSpan), igual que en el Excel real (celdas
+    // combinadas D:H).
+    const rowSpans: number[] = new Array(items.length).fill(1);
+    for (let inicio = 0, i = 1; i <= items.length; i++) {
+      const mismoGrupo = i < items.length
+        && items[i].etapa === items[inicio].etapa
+        && items[i].descripcion_elemento === items[inicio].descripcion_elemento;
+      if (!mismoGrupo) {
+        rowSpans[inicio] = i - inicio;
+        for (let j = inicio + 1; j < i; j++) rowSpans[j] = 0;
+        inicio = i;
+      }
+    }
+    return [
+      {
+        title: 'Etapa', dataIndex: 'etapa', key: 'etapa', width: 90,
+        render: (e: string, _item: ItemVerificacionAuditoria, index: number) => ({
+          children: ETIQUETA_ETAPA[e] ?? '—',
+          props: { rowSpan: rowSpans[index] },
+        }),
+      },
+      {
+        title: 'Elemento a revisar', dataIndex: 'descripcion_elemento', key: 'descripcion_elemento',
+        render: (texto: string, _item: ItemVerificacionAuditoria, index: number) => ({
+          children: texto || '—',
+          props: { rowSpan: rowSpans[index] },
+        }),
+      },
+      { title: 'Requisito ISO', dataIndex: 'requisito_iso', key: 'requisito_iso', width: 120, render: (v: string) => v || '—' },
+      {
+        title: 'Tipo de hallazgo', dataIndex: 'tipo_hallazgo', key: 'tipo_hallazgo', width: 170,
+        render: (v: string) => (v ? <Tag color={COLOR_TIPO_HALLAZGO[v]}>{ETIQUETA_TIPO_HALLAZGO[v]}</Tag> : '—'),
+      },
+      {
+        title: 'Descripción del hallazgo', dataIndex: 'descripcion_hallazgo', key: 'descripcion_hallazgo', width: 260,
+        render: (v: string) => v || '—',
+      },
+      {
+        title: 'Hallazgo', key: 'hallazgo', width: 190,
+        render: (_: unknown, item: ItemVerificacionAuditoria) => {
+          // Una Fortaleza o Conformidad no es una no conformidad ni requiere
+          // subsanación, así que no tiene sentido generarle ni asignarle un hallazgo
+          // (mismo criterio ya aplicado en RelacionarChecklistModal y en el
+          // multi-select de "Items relacionados" de este mismo modal).
+          const aplicaHallazgo = item.tipo_hallazgo === 'NO_CONFORMIDAD' || item.tipo_hallazgo === 'OPORTUNIDAD_MEJORA';
+          return (
+            <Space direction="vertical" size={4}>
+              {item.hallazgo_generado_codigo && <Tag color="purple">{item.hallazgo_generado_codigo}</Tag>}
+              {puedeEditar && aplicaHallazgo && (
+                <Space size={4} wrap>
+                  {!item.hallazgo_generado_codigo && (
+                    <Button size="small" loading={generarHallazgoMutation.isPending} onClick={() => generarHallazgoMutation.mutate(item.id)}>
+                      Generar hallazgo
+                    </Button>
+                  )}
+                  <Button size="small" onClick={() => abrirAsignarExistente(item)}>
+                    {item.hallazgo_generado_codigo ? 'Editar hallazgo' : 'Asignar existente'}
+                  </Button>
+                </Space>
+              )}
+            </Space>
+          );
+        },
+      },
+      {
+        title: '', key: 'acciones', width: 150,
+        render: (_: unknown, item: ItemVerificacionAuditoria) =>
+          puedeEditar && (
+            <Space size={4}>
+              <Button size="small" onClick={() => abrirEditarItem(item)}>Editar</Button>
+              <Popconfirm title="¿Eliminar?" onConfirm={() => eliminarItemMutation.mutate(item.id)}>
+                <Button size="small" danger>Eliminar</Button>
+              </Popconfirm>
+            </Space>
+          ),
+      },
+    ];
+  }
+
+  const claveChecklistActiva = checklistTabActivo ?? gruposChecklist[0]?.clave;
+  const grupoChecklistActivo = gruposChecklist.find((g) => g.clave === claveChecklistActiva);
+
+  function desplazarTabsChecklist(delta: number) {
+    checklistScrollRef.current?.scrollBy({ left: delta, behavior: 'smooth' });
+  }
+
   const tabChecklist = (
     <div>
-      <Table
-        rowKey="id"
-        size="small"
-        pagination={false}
-        dataSource={auditoria?.items_verificacion ?? []}
-        locale={{ emptyText: <Empty description="Sin items registrados." /> }}
-        columns={[
-          { title: 'Etapa', dataIndex: 'etapa', key: 'etapa', width: 90, render: (e: string) => ETIQUETA_ETAPA[e] ?? '—' },
-          { title: 'Elemento a revisar', dataIndex: 'descripcion_elemento', key: 'descripcion_elemento' },
-          { title: 'Requisito ISO', dataIndex: 'requisito_iso', key: 'requisito_iso', width: 120, render: (v: string) => v || '—' },
-          {
-            title: 'Tipo de hallazgo', dataIndex: 'tipo_hallazgo', key: 'tipo_hallazgo', width: 170,
-            render: (v: string) => (v ? <Tag color={COLOR_TIPO_HALLAZGO[v]}>{ETIQUETA_TIPO_HALLAZGO[v]}</Tag> : '—'),
-          },
-          {
-            title: 'Hallazgo', key: 'hallazgo', width: 160,
-            render: (_: unknown, item: ItemVerificacionAuditoria) =>
-              item.hallazgo_generado_codigo ? (
-                <Tag color="purple">{item.hallazgo_generado_codigo}</Tag>
-              ) : (
-                item.tipo_hallazgo && item.tipo_hallazgo !== 'CONFORMIDAD' && puedeEditar && (
-                  <Button size="small" loading={generarHallazgoMutation.isPending} onClick={() => generarHallazgoMutation.mutate(item.id)}>
-                    Generar hallazgo
-                  </Button>
-                )
-              ),
-          },
-          {
-            title: '', key: 'acciones', width: 80,
-            render: (_: unknown, item: ItemVerificacionAuditoria) =>
-              puedeEditar && (
-                <Popconfirm title="¿Eliminar?" onConfirm={() => eliminarItemMutation.mutate(item.id)}>
-                  <Button size="small" danger>Eliminar</Button>
-                </Popconfirm>
-              ),
-          },
-        ]}
-        expandable={{
-          rowExpandable: () => true,
-          expandedRowRender: (item: ItemVerificacionAuditoria) => (
-            <div>
-              <Typography.Text type="secondary">Otros requisitos: {item.otros_requisitos || '—'}</Typography.Text>
-              <br />
-              <Typography.Text type="secondary">Descripción del hallazgo: {item.descripcion_hallazgo || '—'}</Typography.Text>
+      {gruposChecklist.length === 0 ? (
+        <Empty description="Sin items registrados." />
+      ) : (
+        <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, borderBottom: '1px solid #f0f0f0', marginBottom: 12 }}>
+            <Button type="text" size="small" icon={<LeftOutlined />} onClick={() => desplazarTabsChecklist(-240)} style={{ flexShrink: 0 }} />
+            <div ref={checklistScrollRef} style={{ display: 'flex', overflowX: 'auto', scrollBehavior: 'smooth', flex: 1 }}>
+              {gruposChecklist.map((grupo) => {
+                const activo = grupo.clave === claveChecklistActiva;
+                return (
+                  <button
+                    key={grupo.clave}
+                    type="button"
+                    onClick={() => setChecklistTabActivo(grupo.clave)}
+                    style={{
+                      flexShrink: 0,
+                      padding: '8px 14px',
+                      border: 'none',
+                      background: 'none',
+                      cursor: 'pointer',
+                      fontSize: 14,
+                      color: activo ? BRAND.tealDark : '#1a1a1a',
+                      fontWeight: activo ? 600 : 400,
+                      borderBottom: activo ? `2px solid ${BRAND.tealDark}` : '2px solid transparent',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {grupo.titulo} ({grupo.items.length})
+                  </button>
+                );
+              })}
             </div>
-          ),
-        }}
-      />
+            <Button type="text" size="small" icon={<RightOutlined />} onClick={() => desplazarTabsChecklist(240)} style={{ flexShrink: 0 }} />
+          </div>
+          {grupoChecklistActivo && (
+            <Table
+              rowKey="id"
+              size="small"
+              pagination={false}
+              dataSource={grupoChecklistActivo.items}
+              columns={columnasChecklist(grupoChecklistActivo.items)}
+            />
+          )}
+        </>
+      )}
       {puedeEditar && (
         <Space direction="vertical" style={{ marginTop: 12, width: '100%' }}>
           <Space wrap>
@@ -516,6 +766,7 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
   );
 
   return (
+    <>
     <Drawer
       title={
         auditoria ? (
@@ -566,5 +817,196 @@ export function AuditoriaDetalleDrawer({ auditoriaId, onClose }: Props) {
         />
       )}
     </Drawer>
+    <Modal
+      title="Editar item de la lista de verificación"
+      open={itemEditando !== null}
+      onCancel={() => setItemEditando(null)}
+      onOk={() => actualizarItemMutation.mutate()}
+      confirmLoading={actualizarItemMutation.isPending}
+      destroyOnHidden
+      width={640}
+    >
+      <Space direction="vertical" style={{ width: '100%' }}>
+        <Space wrap>
+          <Select placeholder="Sesión (opcional)" allowClear style={{ width: 220 }} options={opcionesSesiones} value={itemEditValores.sesion} onChange={(v) => setItemEditValores({ ...itemEditValores, sesion: v })} />
+          <Select placeholder="Etapa" allowClear style={{ width: 130 }} options={Object.entries(ETIQUETA_ETAPA).map(([value, label]) => ({ value, label }))} value={itemEditValores.etapa} onChange={(v) => setItemEditValores({ ...itemEditValores, etapa: v })} />
+          <Input placeholder="Requisito ISO" style={{ width: 140 }} value={itemEditValores.requisito_iso} onChange={(e) => setItemEditValores({ ...itemEditValores, requisito_iso: e.target.value })} />
+          <Select placeholder="Tipo de hallazgo" allowClear style={{ width: 190 }} options={Object.entries(ETIQUETA_TIPO_HALLAZGO).map(([value, label]) => ({ value, label }))} value={itemEditValores.tipo_hallazgo} onChange={(v) => setItemEditValores({ ...itemEditValores, tipo_hallazgo: v })} />
+        </Space>
+        <Input.TextArea placeholder="Descripción del elemento a revisar" rows={2} value={itemEditValores.descripcion_elemento} onChange={(e) => setItemEditValores({ ...itemEditValores, descripcion_elemento: e.target.value })} />
+        <Input.TextArea placeholder="Otros requisitos" rows={2} value={itemEditValores.otros_requisitos} onChange={(e) => setItemEditValores({ ...itemEditValores, otros_requisitos: e.target.value })} />
+        <Input.TextArea placeholder="Descripción del hallazgo (si aplica)" rows={2} value={itemEditValores.descripcion_hallazgo} onChange={(e) => setItemEditValores({ ...itemEditValores, descripcion_hallazgo: e.target.value })} />
+      </Space>
+    </Modal>
+    <Modal
+      title={itemParaAsignar
+        ? `${itemParaAsignar.hallazgo_generado_codigo ? 'Editar hallazgo' : 'Asignar hallazgo'} — ${itemParaAsignar.descripcion_elemento || 'item de la lista de verificación'}`
+        : 'Asignar hallazgo'}
+      open={itemParaAsignar !== null}
+      onCancel={() => setItemParaAsignar(null)}
+      onOk={() => asignarHallazgoMutation.mutate()}
+      confirmLoading={asignarHallazgoMutation.isPending}
+      destroyOnHidden
+      width={560}
+    >
+      <Typography.Paragraph type="secondary">
+        Selecciona un hallazgo ya existente para relacionarlo con este item (o déjalo vacío para quitar la relación
+        actual). Se muestra también el tratamiento (seguimiento) que ya tenga registrado cada hallazgo, para
+        identificarlo más fácil.
+      </Typography.Paragraph>
+      {hallazgosSugeridos.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <Typography.Text strong style={{ fontSize: 13 }}>
+            Hallazgos ya relacionados con "{itemParaAsignar?.descripcion_elemento}"
+          </Typography.Text>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 2, marginBottom: 8 }}>
+            Otras filas de este mismo elemento ya están relacionadas con estos hallazgos — puedes reutilizar uno si
+            aplica.
+          </Typography.Paragraph>
+          <Space direction="vertical" size={6} style={{ width: '100%' }}>
+            {hallazgosSugeridos.map((h) => (
+              <div
+                key={h.id}
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: 8, border: '1px solid #f0f0f0', borderRadius: 6 }}
+              >
+                <div>
+                  <Space size={6}>
+                    <Tag
+                      color={COLOR_ESTADO_HALLAZGO[h.estado]}
+                      style={{ color: TEXTO_ESTADO_HALLAZGO[h.estado], borderColor: 'transparent' }}
+                    >
+                      {NOMBRE_ESTADO_HALLAZGO[h.estado]}
+                    </Tag>
+                    <Typography.Text strong>{h.codigo}</Typography.Text>
+                  </Space>
+                  <div>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>{h.descripcion}</Typography.Text>
+                  </div>
+                </div>
+                <Button size="small" onClick={() => cambiarHallazgoSeleccionado(h.id)}>Usar este</Button>
+              </div>
+            ))}
+          </Space>
+        </div>
+      )}
+      <Select
+        allowClear
+        showSearch
+        style={{ width: '100%' }}
+        placeholder="Buscar hallazgo por código, descripción o tratamiento..."
+        value={hallazgoSeleccionado}
+        onChange={cambiarHallazgoSeleccionado}
+        filterOption={(input, option) =>
+          `${option?.label ?? ''} ${option?.tratamiento ?? ''}`.toLowerCase().includes(input.toLowerCase())
+        }
+        optionRender={(option) => (
+          <div>
+            <Space size={6} wrap>
+              <Tag
+                color={COLOR_ESTADO_HALLAZGO[option.data.estado as EstadoHallazgo]}
+                style={{ color: TEXTO_ESTADO_HALLAZGO[option.data.estado as EstadoHallazgo], borderColor: 'transparent' }}
+              >
+                {NOMBRE_ESTADO_HALLAZGO[option.data.estado as EstadoHallazgo]}
+              </Tag>
+              <Typography.Text strong>{option.data.codigo}</Typography.Text>
+              <Typography.Text>{option.data.descripcion}</Typography.Text>
+            </Space>
+            {option.data.tratamiento && (
+              <div>
+                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                  Tratamiento: {option.data.tratamiento}
+                </Typography.Text>
+              </div>
+            )}
+          </div>
+        )}
+        options={(hallazgosData?.results ?? []).map((h: Hallazgo) => ({
+          value: h.id,
+          label: `${h.codigo} — ${h.descripcion}`,
+          codigo: h.codigo,
+          descripcion: h.descripcion,
+          estado: h.estado,
+          tratamiento: h.seguimientos.map((s) => s.accion_correctiva).filter(Boolean).join(' | '),
+        }))}
+      />
+      {hallazgoAsignado && (
+        <div style={{ marginTop: 16, padding: 12, background: '#fafafa', borderRadius: 6 }}>
+          <Space size={6} wrap>
+            <Tag
+              color={COLOR_ESTADO_HALLAZGO[hallazgoAsignado.estado]}
+              style={{ color: TEXTO_ESTADO_HALLAZGO[hallazgoAsignado.estado], borderColor: 'transparent' }}
+            >
+              {NOMBRE_ESTADO_HALLAZGO[hallazgoAsignado.estado]}
+            </Tag>
+            <Typography.Text strong>{hallazgoAsignado.codigo}</Typography.Text>
+          </Space>
+          <Typography.Paragraph style={{ marginTop: 4, marginBottom: 12 }}>
+            {hallazgoAsignado.descripcion}
+          </Typography.Paragraph>
+
+          <Typography.Text strong style={{ fontSize: 13 }}>Tratamiento (seguimiento)</Typography.Text>
+          {hallazgoAsignado.seguimientos.length === 0 ? (
+            <Typography.Paragraph type="secondary" style={{ marginTop: 4, marginBottom: 0 }}>
+              Sin seguimiento registrado todavía.
+            </Typography.Paragraph>
+          ) : (
+            <Space direction="vertical" size={8} style={{ width: '100%', marginTop: 8 }}>
+              {hallazgoAsignado.seguimientos.map((s) => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+                  <div style={{ flex: 1 }}>
+                    <Typography.Text style={{ fontSize: 13 }}>{s.accion_correctiva || 'Sin acción correctiva registrada'}</Typography.Text>
+                    <br />
+                    <Tag color={COLOR_VERIFICACION[s.verificacion_eficacia]} style={{ fontSize: 11 }}>
+                      {NOMBRE_VERIFICACION[s.verificacion_eficacia]}
+                    </Tag>
+                  </div>
+                  <Button size="small" onClick={() => abrirGestionSeguimiento(s)}>Editar</Button>
+                </div>
+              ))}
+            </Space>
+          )}
+          <Button size="small" style={{ marginTop: 8 }} onClick={() => abrirGestionSeguimiento(null)}>
+            + Agregar seguimiento
+          </Button>
+
+          <Typography.Text strong style={{ fontSize: 13, display: 'block', marginTop: 16 }}>
+            Otros items del checklist relacionados con este hallazgo
+          </Typography.Text>
+          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: 2, marginBottom: 6 }}>
+            El item actual ({itemParaAsignar?.descripcion_elemento || 'este item'}) se guarda con el selector de
+            arriba. Aquí solo se gestionan los DEMÁS items (de cualquier sesión) — marca o desmarca para agregar o
+            quitar su relación con este mismo hallazgo.
+          </Typography.Paragraph>
+          <Select
+            mode="multiple"
+            showSearch
+            style={{ width: '100%' }}
+            optionFilterProp="label"
+            value={itemsSeleccionadosParaHallazgo}
+            onChange={setItemsSeleccionadosParaHallazgo}
+            options={itemsChecklist
+              .filter((it) => it.id !== itemParaAsignar?.id)
+              .filter((it) => it.tipo_hallazgo !== 'FORTALEZA' && it.tipo_hallazgo !== 'CONFORMIDAD')
+              .filter((it) => !it.hallazgo_generado || it.hallazgo_generado === hallazgoSeleccionado)
+              .map((it) => {
+                const sesionNombre = it.sesion !== null
+                  ? auditoria?.sesiones.find((s) => s.id === it.sesion)?.tema
+                  : undefined;
+                return {
+                  value: it.id,
+                  label: `${it.descripcion_elemento || 'Sin elemento'}${it.requisito_iso ? ` (${it.requisito_iso})` : ''}${sesionNombre ? ` — ${sesionNombre}` : ''}`,
+                };
+              })}
+          />
+        </div>
+      )}
+    </Modal>
+    <SeguimientoFormModal
+      open={seguimientoFormAbierto}
+      hallazgo={hallazgoAsignado ?? null}
+      seguimiento={seguimientoEditando}
+      onClose={() => setSeguimientoFormAbierto(false)}
+    />
+    </>
   );
 }
