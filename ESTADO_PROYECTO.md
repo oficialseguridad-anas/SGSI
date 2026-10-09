@@ -1345,6 +1345,111 @@ Stop-Process -Id <ese_numero> -Force
   `Row align="stretch"` + `Card height:'100%'` para que todas queden de la
   misma altura aunque alguna no tenga desglose que mostrar (p.ej. "Sin
   tratamiento" en 0).
+- **Columna "Activos" clicable, con detalle de solo lectura (2026-10-08, a
+  pedido del usuario)**: antes mostraba texto plano (`nombres.join(', ')`).
+  Ahora cada activo es un `Tag` clicable (`riesgo.activos[i]` +
+  `riesgo.activos_nombres[i]`, arrays paralelos alineados por índice — el
+  tipo `Riesgo` no trae objetos combinados id+nombre) que abre
+  `ActivoDetalleModal` (nuevo, en `features/activos/components/`) con la
+  misma información del módulo de Activos, vía `Descriptions` de antd
+  (primer uso de `Descriptions` en el proyecto — no había precedente ni
+  modal de solo lectura para un Activo, solo `ActivoFormModal`, que es
+  editable). No se creó un endpoint `fetchActivo(id)` nuevo: `RiesgosPage`
+  reusa el `useQuery(['activos'], fetchActivos)` ya cacheado por
+  `ActivosPage` (mismo queryKey) y busca el activo por id en el cliente —
+  sin golpear el backend de nuevo si `ActivosPage` ya se visitó antes.
+  - **Primer intento descartado por el usuario**: colapsar a un solo `Tag`
+    ("N activos" + `Popover` con el detalle) — el usuario lo rechazó
+    ("no me gustó... necesito que se vean los activos"), quería seguir
+    viendo los nombres directamente en la celda, solo que la celda
+    aprovechara mejor su ancho real.
+  - **Causa raíz real del espacio desperdiciado**: no era que la columna
+    necesitara ser más angosta, sino que `Table` de antd usa
+    `tableLayout="auto"` por defecto — el `width` de cada columna es solo
+    una sugerencia; el navegador redistribuye el ancho real según el
+    contenido de TODAS las columnas, dejándole a "Activos" más espacio del
+    declarado y esa diferencia quedaba vacía debajo del único `Tag`
+    visible. Se agregó `tableLayout="fixed"` a la `<Table>` (todas las
+    columnas ya tenían `width` explícito, suman 1450 ≈ `scroll.x`) para que
+    los anchos declarados se respeten de verdad. Con eso, los `Tag` de
+    cada activo (restaurados, ya no colapsados) vuelven a verse todos,
+    envueltos dentro del ancho real de 170px — varios por línea antes de
+    saltar, en vez de uno por línea. Se redujo también el padding/tamaño de
+    fuente de cada `Tag` (11px, padding `0 5px`) para que quepan más por
+    línea.
+  - **Nombres largos truncados dentro de la propia celda (mismo día, a
+    pedido del usuario)**: con `tableLayout="fixed"`, un nombre de activo
+    más largo que el ancho de un `Tag` individual se desbordaba
+    visualmente sobre la columna "Amenaza" vecina (el `Tag` de antd usa
+    `white-space: nowrap` por defecto, sin recorte). Se le agregó al
+    `Tag` `maxWidth: '100%'` + `overflow: hidden` + `textOverflow:
+    'ellipsis'` + **`minWidth: 0`** (el detalle que realmente lo
+    resuelve: sin esto, un hijo flex de `Space wrap` no se encoge por
+    debajo del ancho de su propio contenido — es un comportamiento
+    estándar de flexbox, no un bug de antd — así que el recorte nunca
+    llegaba a aplicarse). Cada `Tag` se envolvió además en un `Tooltip`
+    que muestra el nombre completo al pasar el cursor — el detalle
+    completo también se ve igual al hacer clic (`ActivoDetalleModal`).
+  Las constantes de etiquetas/colores de Activo (`NOMBRE_CLASE`,
+  `NOMBRE_TIPO_ACTIVO`, `COLOR_ETIQUETADO`, `COLOR_ESTADO`,
+  `COLOR_CRITICIDAD`, `NOMBRE_CRITICIDAD`) se **extrajeron** de
+  `ActivosPage.tsx` (donde vivían como constantes locales no exportadas) a
+  un archivo nuevo compartido `features/activos/etiquetas.ts`, para
+  reutilizarlas en el modal nuevo sin duplicarlas — `ActivosPage.tsx` ahora
+  importa desde ahí en vez de declararlas. Se agregó también
+  `NOMBRE_NATURALEZA` (no existía, necesario para mostrar el campo
+  `naturaleza` del Activo en el detalle).
+- **Mismo patrón aplicado al módulo de Activos, en sentido inverso
+  (2026-10-08, a pedido del usuario)**: ahora en `ActivosPage.tsx` la
+  columna **"Nombre"** es clicable (`Typography.Link`) y abre el mismo
+  `ActivoDetalleModal` reutilizado de Riesgos. Además:
+  - **La columna "Acciones" (Editar/Eliminar) se quitó de la tabla
+    principal** y esos botones ahora viven **dentro de
+    `ActivoDetalleModal`**, en su footer — se le agregaron props opcionales
+    `onEditar`/`onEliminar` (ambas con su propio chequeo `hasPerm` interno,
+    vía `useAuth`, igual que el resto de modales del proyecto); si no se
+    pasan esas props (como al abrirlo desde `RiesgosPage`), el footer no
+    muestra ningún botón de acción — queda puramente informativo ahí.
+    `ActivosPage.tsx` cierra el modal de detalle al pulsar Editar (abre
+    `ActivoFormModal`) o Eliminar (dispara la misma mutación de antes).
+  - **Columna nueva "Riesgo asociado"**: muestra el/los código(s) de
+    Riesgo (`R-001`, etc., como `Tag` con el color de `COLOR_NIVEL_RIESGO`)
+    de cualquier `Riesgo` cuyo `activos` (M2M) incluya a ese Activo — **la
+    relación no viene invertida desde el backend**, así que se calcula en
+    el cliente con `riesgosPorActivoId` (un `Map<number, Riesgo[]>`
+    construido con `useMemo` recorriendo `riesgo.activos` de todos los
+    riesgos, igual que `riesgosPorActivoId.get(activo.id)`). Si un activo
+    está relacionado a varios riesgos, se muestran todos sus códigos. Cada
+    `Tag` es clicable y abre `RiesgoDetalleModal` (nuevo, en
+    `features/riesgos/components/`, solo lectura vía `Descriptions` +
+    una tabla compacta de sus tratamientos — sin acciones de edición, no
+    se pidieron ahí). `ActivosPage` trae los riesgos con
+    `useQuery(['riesgos'], fetchRiesgos)`, reusando la caché de
+    `RiesgosPage` si ya se visitó, mismo criterio que el punto anterior.
+  - **Backend ajustado para exponer la relación ya invertida (mismo día, a
+    pedido del usuario)**: el usuario preguntó si la relación
+    Riesgo↔Activo estaba "bien organizada, con referencia a las bases de
+    datos" — se confirmó que **ya era un M2M real de Django**
+    (`Riesgo.activos`, `db_table='riesgoActivos'`, tabla de unión propia
+    con FK a ambas tablas — no había nada que corregir ahí) y que el M2M
+    ya traía `related_name='riesgos'` sin usar. Se aprovechó: `
+    ActivoSerializer` ganó `riesgos_ids`/`riesgos_codigos`
+    (`SerializerMethodField`, ordenados por código vía
+    `obj.riesgos.all()`) — mismo patrón de arrays paralelos ya usado en
+    todo el proyecto (`activos`/`activos_nombres` en `Riesgo`, etc.).
+    `ActivoViewSet.queryset` ganó `.prefetch_related('riesgos')` para
+    evitar N+1 en el listado. En el frontend, `ActivosPage.tsx` dejó de
+    invertir la relación manualmente (recorrer todos los riesgos y
+    agruparlos por `activo.id`) — ahora lee `activo.riesgos_ids`/
+    `riesgos_codigos` directo del payload, y solo usa el `useQuery(['
+    riesgos'])` para un lookup O(1) por id (`riesgosPorId`) cuando hay que
+    abrir el detalle completo de un riesgo (tratamientos, amenaza, etc.,
+    que no viajan en el payload liviano de Activo). Probado end-to-end
+    contra la API real (`APIRequestFactory`): `GET /activos/:id/` y
+    `GET /activos/` (200, 39 de 200 activos con riesgo asociado,
+    `riesgos_ids`/`riesgos_codigos` alineados por índice) — además
+    `manage.py check` sin errores (no hizo falta migración: solo cambiaron
+    serializer/queryset, ningún campo de modelo).
 - Columna **"Amenaza"** de la tabla: el texto visible es `amenaza_nombre`
   (`Amenaza.nombre`, `CharField(max_length=150)` — puede venir truncado si el
   dato original era más largo). El **tooltip al pasar el mouse** usa

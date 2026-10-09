@@ -49,6 +49,8 @@ export interface Activo {
   criticidad: NivelValoracion;
   estado: EstadoActivo;
   fecha_baja: string | null;
+  riesgos_ids: number[];
+  riesgos_codigos: string[];
   creado_en: string;
   actualizado_en: string;
 }

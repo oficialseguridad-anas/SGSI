@@ -6,6 +6,9 @@ import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
+import { fetchActivos } from '../../activos/api';
+import { ActivoDetalleModal } from '../../activos/components/ActivoDetalleModal';
+import type { Activo } from '../../activos/types';
 import { GestionarTratamientoModal } from '../components/GestionarTratamientoModal';
 import { MapaCalorRiesgosModal } from '../components/MapaCalorRiesgosModal';
 import { PrevisualizarEvidenciasModal } from '../components/PrevisualizarEvidenciasModal';
@@ -110,6 +113,7 @@ export function RiesgosPage() {
   const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ['riesgos'], queryFn: fetchRiesgos });
+  const { data: activosData } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [riesgoEditando, setRiesgoEditando] = useState<Riesgo | null>(null);
   const [mapaCalorAbierto, setMapaCalorAbierto] = useState(false);
@@ -119,6 +123,8 @@ export function RiesgosPage() {
   const [tratamientoParaPrevisualizar, setTratamientoParaPrevisualizar] = useState<Riesgo['tratamientos'][number] | null>(
     null,
   );
+  const [activoModalAbierto, setActivoModalAbierto] = useState(false);
+  const [activoSeleccionado, setActivoSeleccionado] = useState<Activo | null>(null);
   const [busqueda, setBusqueda] = useState('');
   const [filtroEstado, setFiltroEstado] = useState<EstadoTratamientoConSinTratar | null>(null);
 
@@ -169,6 +175,12 @@ export function RiesgosPage() {
     setPrevisualizarAbierto(true);
   }
 
+  function abrirActivo(id: number) {
+    const activo = activosData?.results.find((a) => a.id === id) ?? null;
+    setActivoSeleccionado(activo);
+    setActivoModalAbierto(true);
+  }
+
   const eliminarMutation = useMutation({
     mutationFn: eliminarRiesgo,
     onSuccess: () => {
@@ -205,10 +217,33 @@ export function RiesgosPage() {
     },
     {
       title: 'Activos',
-      dataIndex: 'activos_nombres',
       key: 'activos_nombres',
-      width: 220,
-      render: (nombres: string[]) => nombres.join(', '),
+      width: 170,
+      // Tags compactos (padding/tamaño reducido) que sí se ven todos, pero
+      // aprovechando el ancho real de la celda (varios por línea antes de saltar
+      // de línea) — la tabla usa tableLayout="fixed" para que este ancho se
+      // respete de verdad y no quede espacio vacío a la derecha. Si un nombre no
+      // cabe, se recorta con "…" dentro del propio ancho de la celda (no se deja
+      // invadir la columna vecina) — el nombre completo se ve en el tooltip al
+      // pasar el cursor, o abriendo el detalle con el clic.
+      render: (_: unknown, riesgo: Riesgo) => (
+        <Space size={[4, 4]} wrap style={{ maxWidth: '100%' }}>
+          {riesgo.activos_nombres.map((nombre, i) => (
+            <Tooltip key={riesgo.activos[i]} title={nombre}>
+              <Tag
+                style={{
+                  cursor: 'pointer', margin: 0, padding: '0 5px', fontSize: 11, lineHeight: '18px',
+                  maxWidth: '100%', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  display: 'inline-block', verticalAlign: 'middle', boxSizing: 'border-box',
+                }}
+                onClick={() => abrirActivo(riesgo.activos[i])}
+              >
+                {nombre}
+              </Tag>
+            </Tooltip>
+          ))}
+        </Space>
+      ),
     },
     {
       title: 'Amenaza',
@@ -404,7 +439,8 @@ export function RiesgosPage() {
         columns={columns}
         dataSource={riesgosFiltrados}
         pagination={false}
-        scroll={{ x: 1550 }}
+        tableLayout="fixed"
+        scroll={{ x: 1480 }}
         locale={{
           emptyText:
             busqueda || filtroEstado ? <Empty description="Ningún riesgo coincide con el filtro aplicado." /> : undefined,
@@ -423,6 +459,7 @@ export function RiesgosPage() {
         archivos={tratamientoParaPrevisualizar?.archivos_adjuntos ?? []}
         onClose={() => setPrevisualizarAbierto(false)}
       />
+      <ActivoDetalleModal open={activoModalAbierto} activo={activoSeleccionado} onClose={() => setActivoModalAbierto(false)} />
     </Card>
   );
 }

@@ -22,6 +22,8 @@ class ActivoSerializer(serializers.ModelSerializer):
     proceso_nombre = serializers.CharField(source='direccion.proceso.nombre', read_only=True, default=None)
     puntaje_valoracion = serializers.IntegerField(read_only=True)
     criticidad = serializers.CharField(read_only=True)
+    riesgos_ids = serializers.SerializerMethodField()
+    riesgos_codigos = serializers.SerializerMethodField()
 
     class Meta:
         model = Activo
@@ -32,9 +34,18 @@ class ActivoSerializer(serializers.ModelSerializer):
             'etiquetado', 'contiene_datos_personales',
             'valor_confidencialidad', 'valor_integridad', 'valor_disponibilidad',
             'puntaje_valoracion', 'criticidad',
-            'estado', 'fecha_baja', 'creado_en', 'actualizado_en',
+            'estado', 'fecha_baja', 'riesgos_ids', 'riesgos_codigos', 'creado_en', 'actualizado_en',
         ]
         read_only_fields = ['id', 'codigo', 'creado_en', 'actualizado_en']
+
+    def _riesgos_ordenados(self, obj):
+        return sorted(obj.riesgos.all(), key=lambda r: r.codigo)
+
+    def get_riesgos_ids(self, obj):
+        return [r.id for r in self._riesgos_ordenados(obj)]
+
+    def get_riesgos_codigos(self, obj):
+        return [r.codigo for r in self._riesgos_ordenados(obj)]
 
 
 class SnapshotActivoSerializer(serializers.ModelSerializer):

@@ -1,14 +1,20 @@
 import { DownloadOutlined, PlusOutlined, SearchOutlined } from '@ant-design/icons';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Button, Card, Col, Empty, Input, Popconfirm, Row, Space, Table, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Empty, Input, Row, Space, Table, Tag, Typography, message } from 'antd';
 import { useMemo, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../app/AuthContext';
 import { ErrorCarga } from '../../../shared/components/ErrorCarga';
 import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
+import { fetchRiesgos } from '../../riesgos/api';
+import { RiesgoDetalleModal } from '../../riesgos/components/RiesgoDetalleModal';
+import { COLOR_NIVEL_RIESGO, TEXTO_NIVEL_RIESGO } from '../../riesgos/nivelRiesgo';
+import type { Riesgo } from '../../riesgos/types';
+import { ActivoDetalleModal } from '../components/ActivoDetalleModal';
 import { ActivoFormModal } from '../components/ActivoFormModal';
 import { ExportarActivosModal } from '../components/ExportarActivosModal';
+import { COLOR_CRITICIDAD, COLOR_ESTADO, COLOR_ETIQUETADO, NOMBRE_CLASE, NOMBRE_CRITICIDAD, NOMBRE_TIPO_ACTIVO } from '../etiquetas';
 import { eliminarActivo, fetchActivos } from '../api';
 import type { Activo, ClaseActivo, EstadoActivo, EtiquetadoActivo, NivelValoracion, TipoActivo } from '../types';
 
@@ -95,54 +101,20 @@ function TarjetaKpi({
   );
 }
 
-const NOMBRE_CLASE: Record<ClaseActivo, string> = {
-  SISTEMAS_INFORMACION: 'Sistemas de Información',
-  PERSONAL: 'Personal',
-  SOFTWARE: 'Software',
-  HARDWARE: 'Hardware',
-  INFORMACION: 'Información',
-  ESTRUCTURA_ORGANIZACION: 'Estructura de la organización',
-  RED: 'Red',
-};
-
-const COLOR_ETIQUETADO: Record<EtiquetadoActivo, string> = {
-  PUBLICO: 'default',
-  PRIVADO: 'blue',
-  CONFIDENCIAL: 'red',
-};
-
-const COLOR_ESTADO: Record<EstadoActivo, string> = {
-  ACTIVO: 'green',
-  EN_MANTENIMIENTO: 'orange',
-  RETIRADO: 'default',
-};
-
-const COLOR_CRITICIDAD: Record<NivelValoracion, string> = {
-  BAJA: 'green',
-  MEDIA: 'gold',
-  ALTA: 'red',
-};
-
-const NOMBRE_CRITICIDAD: Record<NivelValoracion, string> = {
-  BAJA: 'Baja',
-  MEDIA: 'Media',
-  ALTA: 'Alta',
-};
-
 const CELDA_AJUSTABLE: CSSProperties = { whiteSpace: 'normal', wordBreak: 'break-word' };
-
-const NOMBRE_TIPO_ACTIVO: Record<TipoActivo, string> = {
-  PRIMARIO: 'Primario',
-  SECUNDARIO: 'Secundario',
-};
 
 export function ActivosPage() {
   const { hasPerm } = useAuth();
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useQuery({ queryKey: ['activos'], queryFn: fetchActivos });
+  const { data: riesgosData } = useQuery({ queryKey: ['riesgos'], queryFn: fetchRiesgos });
   const [modalAbierto, setModalAbierto] = useState(false);
   const [activoEditando, setActivoEditando] = useState<Activo | null>(null);
   const [exportarAbierto, setExportarAbierto] = useState(false);
+  const [activoDetalleAbierto, setActivoDetalleAbierto] = useState(false);
+  const [activoParaDetalle, setActivoParaDetalle] = useState<Activo | null>(null);
+  const [riesgoDetalleAbierto, setRiesgoDetalleAbierto] = useState(false);
+  const [riesgoParaDetalle, setRiesgoParaDetalle] = useState<Riesgo | null>(null);
   const [busqueda, setBusqueda] = useState('');
   // undefined = sin filtro (tarjeta "Total"); null = tarjeta "Sin proceso asignado";
   // string = nombre de un proceso puntual.
@@ -203,6 +175,16 @@ export function ActivosPage() {
     setFiltroProceso((actual) => (actual === nombre ? undefined : nombre));
   }
 
+  // `Activo.riesgos_ids`/`riesgos_codigos` ya vienen invertidos desde el backend
+  // (ActivoSerializer, a partir del related_name='riesgos' del M2M `Riesgo.activos`) —
+  // solo se arma aquí un índice por id para abrir el detalle completo del riesgo
+  // elegido (tratamientos, amenaza, etc.), que no viaja en el payload de Activo.
+  const riesgosPorId = useMemo(() => {
+    const mapa = new Map<number, Riesgo>();
+    (riesgosData?.results ?? []).forEach((riesgo) => mapa.set(riesgo.id, riesgo));
+    return mapa;
+  }, [riesgosData]);
+
   const eliminarMutation = useMutation({
     mutationFn: eliminarActivo,
     onSuccess: () => {
@@ -222,6 +204,16 @@ export function ActivosPage() {
     setModalAbierto(true);
   }
 
+  function abrirDetalleActivo(activo: Activo) {
+    setActivoParaDetalle(activo);
+    setActivoDetalleAbierto(true);
+  }
+
+  function abrirDetalleRiesgo(id: number) {
+    setRiesgoParaDetalle(riesgosPorId.get(id) ?? null);
+    setRiesgoDetalleAbierto(true);
+  }
+
   const columns = [
     {
       title: 'Código',
@@ -233,6 +225,9 @@ export function ActivosPage() {
     {
       title: 'Nombre', dataIndex: 'nombre', key: 'nombre', width: 220,
       onCell: () => ({ style: CELDA_AJUSTABLE }),
+      render: (nombre: string, activo: Activo) => (
+        <Typography.Link onClick={() => abrirDetalleActivo(activo)}>{nombre}</Typography.Link>
+      ),
     },
     {
       title: 'Proceso',
@@ -288,26 +283,29 @@ export function ActivosPage() {
       render: (estado: EstadoActivo) => <Tag color={COLOR_ESTADO[estado]}>{estado}</Tag>,
     },
     {
-      title: 'Acciones',
-      key: 'acciones',
-      width: 140,
-      render: (_: unknown, activo: Activo) => (
-        <Space>
-          {hasPerm('activos.change_activo') && (
-            <Button size="small" onClick={() => abrirEditar(activo)}>Editar</Button>
-          )}
-          {hasPerm('activos.delete_activo') && (
-            <Popconfirm
-              title="¿Eliminar este activo?"
-              okText="Eliminar"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => eliminarMutation.mutate(activo.id)}
-            >
-              <Button size="small" danger>Eliminar</Button>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
+      title: 'Riesgo asociado',
+      key: 'riesgo_asociado',
+      width: 150,
+      render: (_: unknown, activo: Activo) =>
+        activo.riesgos_ids.length ? (
+          <Space size={[4, 4]} wrap>
+            {activo.riesgos_ids.map((id, i) => {
+              const nivel = riesgosPorId.get(id)?.nivel_de_riesgo;
+              return (
+                <Tag
+                  key={id}
+                  color={nivel ? COLOR_NIVEL_RIESGO[nivel] : undefined}
+                  style={{ color: nivel ? TEXTO_NIVEL_RIESGO[nivel] : undefined, borderColor: 'transparent', cursor: 'pointer' }}
+                  onClick={() => abrirDetalleRiesgo(id)}
+                >
+                  {activo.riesgos_codigos[i]}
+                </Tag>
+              );
+            })}
+          </Space>
+        ) : (
+          '—'
+        ),
     },
   ];
 
@@ -392,6 +390,20 @@ export function ActivosPage() {
       />
       <ActivoFormModal open={modalAbierto} activo={activoEditando} onClose={() => setModalAbierto(false)} />
       <ExportarActivosModal open={exportarAbierto} activos={activos} onClose={() => setExportarAbierto(false)} />
+      <ActivoDetalleModal
+        open={activoDetalleAbierto}
+        activo={activoParaDetalle}
+        onClose={() => setActivoDetalleAbierto(false)}
+        onEditar={(activo) => {
+          setActivoDetalleAbierto(false);
+          abrirEditar(activo);
+        }}
+        onEliminar={(activo) => {
+          setActivoDetalleAbierto(false);
+          eliminarMutation.mutate(activo.id);
+        }}
+      />
+      <RiesgoDetalleModal open={riesgoDetalleAbierto} riesgo={riesgoParaDetalle} onClose={() => setRiesgoDetalleAbierto(false)} />
     </Card>
   );
 }

@@ -27,7 +27,7 @@ class DireccionViewSet(viewsets.ModelViewSet):
 
 
 class ActivoViewSet(viewsets.ModelViewSet):
-    queryset = Activo.objects.select_related('direccion__proceso').all()
+    queryset = Activo.objects.select_related('direccion__proceso').prefetch_related('riesgos').all()
     serializer_class = ActivoSerializer
     permission_classes = [IsAuthenticated, DjangoModelPermissions]
     filterset_fields = [
