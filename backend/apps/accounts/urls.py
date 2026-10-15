@@ -11,6 +11,7 @@ from .views import (
     EnviarCodigoEmailActivacionView,
     ImportarEmpleadosView,
     MeView,
+    PermisoViewSet,
     PlantillaEmpleadosView,
     ReenviarCodigoOtpView,
     RolViewSet,
@@ -28,6 +29,7 @@ router = DefaultRouter()
 router.register('empleados', EmpleadoViewSet, basename='empleado')
 router.register('usuarios', UsuarioViewSet, basename='usuario')
 router.register('roles', RolViewSet, basename='rol')
+router.register('permisos', PermisoViewSet, basename='permiso')
 router.register('usuario-roles', UsuarioRolViewSet, basename='usuariorol')
 
 urlpatterns = [

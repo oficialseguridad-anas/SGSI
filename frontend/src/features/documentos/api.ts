@@ -1,4 +1,5 @@
 import { apiClient } from '../../shared/api/client';
+import { descargarArchivo } from '../../shared/api/descargarArchivo';
 import type { Documento, DocumentoInput, VersionDocumento, VersionDocumentoInput } from './types';
 
 export async function fetchDocumentos() {
@@ -39,4 +40,8 @@ export async function fetchVersionesDocumento(documentoId: number) {
 export async function crearVersionDocumento(payload: VersionDocumentoInput) {
   const { data } = await apiClient.post<VersionDocumento>('/versiones-documento/', construirFormData(payload));
   return data;
+}
+
+export async function descargarListadoMaestro() {
+  await descargarArchivo('/documentos-listado-maestro/', 'Listado_Maestro_de_Documentos_SGSI.xlsx');
 }

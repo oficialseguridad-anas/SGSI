@@ -5,7 +5,10 @@ import type {
   EmpleadoInput,
   LoginResultado,
   Me,
+  Permiso,
   ResumenImportacionEmpleados,
+  Rol,
+  RolInput,
   Setup2FA,
   TokensJWT,
   Usuario,
@@ -127,5 +130,29 @@ export async function enviarCodigoEmailActivacion() {
 
 export async function activarEmail2fa(codigo: string) {
   const { data } = await apiClient.post<{ codigos_recuperacion: string[] }>('/auth/2fa/email/activar/', { codigo });
+  return data;
+}
+
+export async function fetchRoles() {
+  const { data } = await apiClient.get<{ results: Rol[]; count: number }>('/roles/');
+  return data;
+}
+
+export async function crearRol(payload: RolInput) {
+  const { data } = await apiClient.post<Rol>('/roles/', payload);
+  return data;
+}
+
+export async function actualizarRol(id: number, payload: RolInput) {
+  const { data } = await apiClient.patch<Rol>(`/roles/${id}/`, payload);
+  return data;
+}
+
+export async function eliminarRol(id: number) {
+  await apiClient.delete(`/roles/${id}/`);
+}
+
+export async function fetchPermisos() {
+  const { data } = await apiClient.get<{ results: Permiso[]; count: number }>('/permisos/');
   return data;
 }

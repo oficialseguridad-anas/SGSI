@@ -1317,6 +1317,105 @@ Stop-Process -Id <ese_numero> -Force
   Usuarios`). El módulo de Usuarios (menú, ruta y API) solo es visible para
   administradores (`is_superuser`).
 
+### Roles y permisos (2026-10-14, a pedido del usuario)
+- **Motivo**: el usuario preguntó cómo estaba construido el flujo
+  Roles↔Usuarios↔Permisos, imaginando: crear un rol con sus permisos →
+  crear/editar un usuario asignándole ese rol → opcionalmente darle al
+  usuario algún permiso individual adicional aparte del rol. Se investigó
+  (sin tocar código) y se confirmó que el MODELO ya existía (`Rol` como
+  envoltura 1-a-1 sobre `Group` de Django, `UsuarioRol` como tabla puente
+  que sincroniza `usuario.groups`, y la resolución de permisos
+  `has_perm()`/`hasPerm()` ya funcionaba de punta a punta) pero **ninguna
+  de las tres acciones tenía UI/API de alto nivel** — solo eran posibles
+  desde el admin crudo de Django, en pantallas separadas y desconectadas.
+  El usuario pidió construir esas tres piezas.
+- **Backend — `RolSerializer`** (`apps/accounts/serializers.py`) ganó
+  `permisos` (entrada: ids de `Permission`, se traducen a
+  `grupo.permissions.set(...)` en `create()`/`update()`) y
+  `permisos_detalle` (salida: detalle legible, para marcar los checkboxes
+  correctos al editar). `es_rol_sistema` quedó en `read_only_fields` (no se
+  puede alternar vía API, solo por fixture/admin). Nuevo
+  `PermisoSerializer`/`PermisoViewSet` (solo lectura, `EsAdministrador`,
+  sin override de paginación — con ~250 permisos reales caben en una sola
+  página del `PAGE_SIZE=500` global, igual que todo lo demás).
+- **Backend — `UsuarioSerializer`/`UsuarioCreateSerializer`** ganaron
+  `roles_ids` (ids de `Rol`, con `source='roles'` — ese `source` NO apunta
+  a la property real `Usuario.roles` para nada funcional, solo es la clave
+  dentro de `validated_data`, ya que el campo es `write_only`) y
+  `permisos_ids` (ids de `Permission`, `source='user_permissions'`, el M2M
+  real heredado de `PermissionsMixin`). `UsuarioSerializer` también ganó
+  `permisos_directos` (lectura, `user_permissions` con detalle) para que el
+  frontend pueda mostrar/precargar qué permisos individuales ya tiene un
+  usuario, aparte de los de sus roles.
+- **Dos bugs reales encontrados y corregidos probando con datos reales (no
+  solo revisando el código)**:
+  1. `_sincronizar_roles()` (función nueva en serializers.py, crea/quita
+     filas `UsuarioRol` para igualar la lista de roles pedida) inicialmente
+     quitaba los roles sobrantes con
+     `UsuarioRol.objects.filter(...).delete()` — un `.delete()` de
+     **queryset** hace un DELETE masivo en SQL y **no llama** al `.delete()`
+     sobreescrito de `UsuarioRol` (el que hace
+     `usuario.groups.remove(grupo)`). Resultado: la fila `UsuarioRol` 
+     desaparecía pero el usuario se quedaba en el `Group` — conservaba los
+     permisos del rol que supuestamente se le acababa de quitar. Se
+     corrigió iterando y borrando cada instancia (`for ... : obj.delete()`),
+     para que el override sí se dispare.
+  2. `RolViewSet.perform_destroy` borraba el `Rol` directo — pero
+     `Rol.grupo` es `on_delete=CASCADE` desde `Group` hacia `Rol` (si se
+     borra el Group se borra el Rol), **no al revés**: borrar el Rol dejaba
+     el `Group` huérfano en la BD, sin limpiar su membresía M2M. Se corrigió
+     para borrar `instance.grupo` (eso sí cascada hacia el Rol vía el
+     colector del ORM, y limpia automáticamente `usuario.groups` de todos
+     los que lo tenían).
+  - Ambos se detectaron y verificaron con `APIRequestFactory` contra datos
+    reales (crear rol+usuario, quitar el rol, verificar `UsuarioRol` +
+    `usuario.groups` + `has_perm()` con una instancia **fresca** de
+    `Usuario` — importante: `has_perm()`/`get_all_permissions()` cachean el
+    resultado en la propia instancia de Python, `refresh_from_db()` NO
+    limpia ese cache, así que reutilizar el mismo objeto Python entre
+    chequeos da falsos negativos/positivos — hay que pedir
+    `Usuario.objects.get(...)` de nuevo para cada chequeo real).
+  - También se protegió: borrar un Rol con `es_rol_sistema=True` (los 4
+    reales: ADMINISTRADOR, CONSULTA, GESTION, LIMITADO) devuelve 400 en vez
+    de borrarlo.
+- **Frontend — nuevo módulo "Roles"** (`features/accounts/pages/RolesPage.tsx`
+  + `components/RolFormModal.tsx`, ítem de menú solo para administradores,
+  igual que Usuarios): crear/editar un rol con selector de permisos
+  agrupado por módulo (`components/PermisosSelector.tsx`, nuevo —
+  `Collapse` + `Checkbox.Group` por `app_label`, con checkbox "marcar todo
+  el módulo" en cada encabezado y buscador; reutilizado también dentro del
+  formulario de Usuario, para no duplicar esa lógica).
+- **Frontend — `UsuarioFormModal.tsx`** ganó un `Select` multi-selección de
+  **Roles** y, dentro de un panel colapsable "Permisos individuales
+  adicionales (opcional)", el mismo `PermisosSelector` — exactamente el
+  flujo que pidió el usuario (rol(es) + permiso suelto opcional desde el
+  propio usuario).
+- Probado end-to-end contra la API real: crear rol con permisos → crear
+  usuario con ese rol → `has_perm` correcto vía el rol; asignar permiso
+  individual aparte → `has_perm` correcto sin depender de ningún rol;
+  quitar el rol → se pierde el permiso del rol pero se conserva el
+  individual; borrar el rol con un usuario todavía asignado → el usuario
+  pierde el permiso correctamente y el `Group` no queda huérfano; nombre de
+  rol duplicado → 400 con mensaje claro (el `UniqueValidator` automático de
+  DRF ya da un mensaje aceptable en español aquí, a diferencia del caso de
+  `Documento.codigo`, así que no hizo falta un `validate_nombre` custom).
+- **Navegación (mismo día, pedido de seguimiento)**: el usuario pidió
+  agrupar "Roles" dentro del módulo de "Usuarios" bajo un único módulo
+  llamado "Gestión de Usuarios", y de paso incluir también "Empleados" ahí.
+  En `Shell.tsx` los tres ítems planos (`usuarios`, `roles`, `empleados`)
+  se reemplazaron por un único padre `gestion-usuarios` con `children`
+  (mismo patrón ya usado en "Auditoría Interna"/"Seguimiento Anexo A"; los
+  hijos no llevan ícono en este layout). El padre NO lleva `adminOnly` —
+  el gating quedó en cada hijo individualmente (`usuarios`/`roles` con
+  `adminOnly: true`, `empleados` con su `perm: 'accounts.view_empleado'`
+  de siempre), porque `construir()` filtra cada nodo por separado y no
+  propaga el `adminOnly` del padre a los hijos; ponerlo en el padre habría
+  ocultado "Empleados" a usuarios no-superusuario que sí tienen el permiso,
+  cambiando sin querer su visibilidad actual. Las rutas en `App.tsx`
+  (`/usuarios`, `/roles`, `/empleados`) no cambiaron. Iconos `IdcardOutlined`
+  y `LockOutlined` quedaron sin uso tras el cambio y se removieron del
+  import.
+
 ### Riesgos
 - `activos` es multi-selección (M2M), no un solo activo.
 - Se eliminó el campo/modelo `Vulnerabilidad` por completo.
@@ -1474,9 +1573,91 @@ Stop-Process -Id <ese_numero> -Force
   (xlsx/xls/xlsm — parseado en el navegador con `xlsx`/SheetJS, renderizado
   como tabla HTML con pestañas si el libro tiene varias hojas). Otros formatos
   (doc, ppt, zip...) solo se pueden descargar.
-- **Tarjetas KPI** (`DocumentosPage.tsx`) agrupadas por **Tipo** (11 tipos fijos
-  del enum `TipoDocumento`): "Total" + una por tipo, paleta categórica de 11
-  colores (8 validados del skill de dataviz + 3 extendidos), clicables (toggle).
+- **Tarjetas KPI** (`DocumentosPage.tsx`) agrupadas por **Tipo** (12 tipos fijos
+  del enum `TipoDocumento`, el 12º — `ALCANCE`/"Alcance" — agregado el
+  2026-10-14 a pedido del usuario, tras detectar en la comparación contra el
+  archivo real que `ALC-860-01` "Alcance del SGSI" no tenía tipo equivalente
+  en el sistema; migración `0014_alter_documento_tipo.py`): "Total" + una por
+  tipo, paleta categórica de 12 colores (8 validados del skill de dataviz +
+  4 extendidos), clicables (toggle).
+  Las constantes `NOMBRE_TIPO`/`TIPOS_DOCUMENTO` se extrajeron a
+  `features/documentos/tipoDocumento.ts` (2026-10-14, para reutilizarlas en
+  `ListadoMaestroModal` sin duplicarlas — mismo criterio que
+  `features/activos/etiquetas.ts`).
+- **Listado Maestro de Documentos SGSI (2026-10-14, a pedido del usuario, con
+  la plantilla real)**: el usuario compartió el Excel institucional real
+  "Listado Maestro de Documentos SGSI.xlsx" (colocado en la raíz del repo, no
+  versionado en git) — una hoja "Listado" consolidada + una hoja por tipo
+  (Manual, Política, Procedimiento, Plan, Formato, Guía, Matriz, Programa,
+  Protocolo), columnas PROCESO / SUB PROCESO / TIPO DE DOC. / CODIGO DE
+  PROCESO / CONSECUTIVO / CODIGO DOCUMENTO / NOMBRE DEL DOCUMENTO / VERSION /
+  OBSERVACIONES, logo institucional. Se copió a
+  `apps/documentos/excel_templates/Listado_Maestro_de_Documentos_SGSI.xlsx`.
+  - **Se regenera en caliente en cada descarga, nunca un archivo "congelado"**
+    (pedido explícito del usuario: "integralo para que cada documento que se
+    vaya guardando en el sistema lo agregue automático al listado y grupo que
+    corresponda") — `apps/documentos/excel_builder_listado.py`
+    (`generar_listado_maestro_xlsx()`) abre la plantilla real, limpia el
+    rango de filas de datos (sin usar `insert_rows`/`delete_rows` — esta
+    plantilla no tiene merges por fila, solo el título, así que no hace
+    falta la técnica de unmerge/remerge de otros builders) y la rellena de
+    nuevo con los `Documento` actuales, agrupados por `tipo` en su hoja
+    correspondiente. Si aparece un documento de un tipo sin hoja propia
+    todavía en la plantilla (Instructivo/Registro, sin ejemplos reales aún;
+    y ahora también Alcance, agregado el mismo día — ver más abajo), se
+    clona el formato de una hoja de tipo existente (`Protocolo`) antes de
+    escribir, para no perder el estilo institucional. **Verificado end-to-end
+    con un documento real de prueba tipo Alcance** (creado, se confirmó que
+    `generar_listado_maestro_xlsx()` crea la hoja "Alcance" sola con los
+    datos correctos, y se borró el documento de prueba — sin dejar rastro,
+    el conteo total de documentos volvió a 60).
+  - **`CONSECUTIVO`, `TIPO DE DOC.` y `CODIGO DE PROCESO` se derivan del
+    propio `codigo`** (ej. `'PO-860-04'` → tipo `'PO'`, código de proceso
+    `860`, consecutivo `'04'`) — no son campos nuevos, se parsean al vuelo
+    partiendo por `-`. Verificado contra el archivo real: el campo
+    CONSECUTIVO coincide exactamente con el último segmento del código en
+    las 53 filas reales (incluyendo que el 860 no es constante — dos
+    documentos reales usan "1200", también derivado correctamente).
+  - **`PROCESO`/`SUB PROCESO` SÍ son campos nuevos** (`Documento.proceso`,
+    `Documento.sub_proceso`, migración `0012_agregar_proceso_subproceso`):
+    no son derivables de nada existente (verificado que un mismo tipo, ej.
+    Política, aparece con `PROCESO` distinto según el documento puntual —
+    no hay regla fija tipo→proceso). Se analizó enlazarlos al catálogo real
+    `activos.Proceso` pero sus abreviaturas (`DAT`/`GHU`/`DTI`) no
+    corresponden a ese catálogo (nombres completos como "Gestión Humana"),
+    así que quedaron como texto libre opcional, editable desde
+    `DocumentoFormModal`. **Migración de backfill
+    `0013_backfill_proceso_subproceso.py`**: de las 53 filas del archivo
+    real, 49 coinciden por `codigo` con documentos ya cargados en la BD (4
+    códigos del archivo — `MP-860-02`, `PT-860-02`, `GA-860-06`,
+    `ALC-860-01` — nunca se cargaron como `Documento` real) y se
+    precargaron con sus valores reales; los 11 documentos más nuevos que la
+    BD ya tiene y el archivo no alcanzó a incluir quedan con esos dos
+    campos en blanco, para completarlos a mano cuando corresponda.
+  - **Validación de duplicados al crear/editar un documento (pedido
+    explícito del usuario: "que no deje agregar un documento si ya se
+    encuentra creado")**: `DocumentoSerializer.validate_codigo` y
+    `validate_titulo` (comparación `iexact`, excluyendo la propia instancia
+    al editar) devuelven un mensaje en español claro en vez de depender del
+    `UniqueValidator` automático de DRF (que solo cubría `codigo`, con un
+    mensaje genérico) — `codigo` se declaró explícito en el serializer
+    (`serializers.CharField(...)`) para que ModelSerializer no le agregue
+    ese validador automático por duplicado. `DocumentoFormModal.tsx` ahora
+    extrae el mensaje real del error (`extraerMensajeError`, mismo patrón ya
+    usado en `SeguimientoFormModal.tsx` de Riesgos) en vez de un mensaje
+    genérico siempre igual.
+  - Frontend: botón **"Listado Maestro"** en `DocumentosPage.tsx` abre
+    `ListadoMaestroModal.tsx` (nuevo) — pestañas por tipo (+ "Todos"), tabla
+    de solo lectura (Consecutivo/Código/Nombre/Versión) con los documentos
+    ya cargados en la página (sin fetch nuevo), y botón "Descargar Excel"
+    que pega a `GET /documentos-listado-maestro/`
+    (`ListadoMaestroDocumentosView`, nueva).
+  - Probado end-to-end contra la API real (`APIRequestFactory` +
+    `force_authenticate`): descarga del Excel (200, ~236 KB, 60 documentos
+    repartidos correctamente en "Listado" + sus hojas de tipo), creación de
+    documento con `codigo` duplicado → 400 con mensaje claro, con `titulo`
+    duplicado → 400 con mensaje claro. Backend reiniciado (waitress no
+    recarga solo) y confirmado arriba tras los cambios.
 
 ### Hallazgos de auditoría
 - **Tarjetas KPI** (`HallazgosPage.tsx`) por columna **Estado**

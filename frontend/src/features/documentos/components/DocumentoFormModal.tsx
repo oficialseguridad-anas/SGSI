@@ -9,6 +9,7 @@ import { HistorialVersionesModal } from './HistorialVersionesModal';
 import type { Documento, DocumentoInput } from '../types';
 
 const OPCIONES_TIPO = [
+  { value: 'ALCANCE', label: 'Alcance' },
   { value: 'FORMATO', label: 'Formato' },
   { value: 'GUIA', label: 'Guía' },
   { value: 'INSTRUCTIVO', label: 'Instructivo' },
@@ -21,6 +22,22 @@ const OPCIONES_TIPO = [
   { value: 'PROTOCOLO', label: 'Protocolo' },
   { value: 'REGISTRO', label: 'Registro' },
 ];
+
+// Convierte la respuesta de error de DRF ({campo: [...]}, {detail}, o un string suelto)
+// en un mensaje legible, en vez de mostrar siempre el mismo texto genérico sin
+// importar la causa real (código/título duplicado, validación, etc.).
+function extraerMensajeError(err: unknown): string | null {
+  const data = (err as { response?: { data?: unknown } }).response?.data;
+  if (!data) return null;
+  if (typeof data === 'string') return data;
+  if (typeof data === 'object') {
+    for (const valor of Object.values(data as Record<string, unknown>)) {
+      if (Array.isArray(valor) && typeof valor[0] === 'string') return valor[0];
+      if (typeof valor === 'string') return valor;
+    }
+  }
+  return null;
+}
 
 const OPCIONES_ESTADO = [
   { value: 'BORRADOR', label: 'Borrador' },
@@ -57,6 +74,8 @@ export function DocumentoFormModal({ open, documento, onClose }: Props) {
         codigo: documento.codigo,
         titulo: documento.titulo,
         tipo: documento.tipo,
+        proceso: documento.proceso,
+        sub_proceso: documento.sub_proceso,
         version_actual: documento.version_actual,
         estado: documento.estado,
         propietario: documento.propietario,
@@ -65,7 +84,7 @@ export function DocumentoFormModal({ open, documento, onClose }: Props) {
         fecha_proxima_revision: documento.fecha_proxima_revision ? dayjs(documento.fecha_proxima_revision) : null,
       });
     } else {
-      form.setFieldsValue({ version_actual: '1.0', estado: 'BORRADOR' });
+      form.setFieldsValue({ version_actual: '1.0', estado: 'BORRADOR', proceso: '', sub_proceso: '' });
     }
   }, [open, documento, form]);
 
@@ -86,8 +105,10 @@ export function DocumentoFormModal({ open, documento, onClose }: Props) {
       queryClient.invalidateQueries({ queryKey: ['documentos'] });
       onClose();
     },
-    onError: () => {
-      message.error('No se pudo guardar el documento. Revisa los datos e intenta de nuevo.');
+    onError: (err) => {
+      message.error(
+        extraerMensajeError(err) ?? 'No se pudo guardar el documento. Revisa los datos e intenta de nuevo.',
+      );
     },
   });
 
@@ -123,6 +144,24 @@ export function DocumentoFormModal({ open, documento, onClose }: Props) {
           </Form.Item>
           <Form.Item name="estado" label="Estado" rules={[{ required: true }]} style={{ flex: 1 }}>
             <Select options={OPCIONES_ESTADO} />
+          </Form.Item>
+        </div>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Form.Item
+            name="proceso"
+            label="Proceso"
+            tooltip="Clasificación del Listado Maestro de Documentos SGSI (ej. DAT, GHU, DTI) — opcional."
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="DAT" />
+          </Form.Item>
+          <Form.Item
+            name="sub_proceso"
+            label="Sub proceso"
+            tooltip="Ej. TYC, TI — opcional."
+            style={{ flex: 1 }}
+          >
+            <Input placeholder="TYC" />
           </Form.Item>
         </div>
         <Form.Item name="propietario" label="Propietario" rules={[{ required: true, message: 'Selecciona un propietario' }]}>

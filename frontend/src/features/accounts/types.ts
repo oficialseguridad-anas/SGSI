@@ -22,11 +22,26 @@ export interface ResumenImportacionEmpleados {
   omitidos: string[];
 }
 
+export interface Permiso {
+  id: number;
+  name: string;
+  codename: string;
+  app_label: string;
+  modelo: string;
+}
+
 export interface Rol {
   id: number;
   nombre: string;
   descripcion: string;
   es_rol_sistema: boolean;
+  permisos_detalle: Permiso[];
+}
+
+export interface RolInput {
+  nombre: string;
+  descripcion: string;
+  permisos: number[];
 }
 
 export interface Usuario {
@@ -40,6 +55,7 @@ export interface Usuario {
   is_active: boolean;
   debe_cambiar_password: boolean;
   roles: Rol[];
+  permisos_directos: Permiso[];
   date_joined: string;
 }
 
@@ -52,6 +68,8 @@ export interface UsuarioCreateInput {
   password: string;
   is_active: boolean;
   debe_cambiar_password: boolean;
+  roles_ids: number[];
+  permisos_ids: number[];
 }
 
 export type UsuarioUpdateInput = Omit<UsuarioCreateInput, 'password'>;

@@ -22,6 +22,7 @@ def ruta_archivo_version_documento(instance, nombre_archivo):
 
 class Documento(TimeStampedModel):
     class Tipo(models.TextChoices):
+        ALCANCE = 'ALCANCE', 'Alcance'
         FORMATO = 'FORMATO', 'Formato'
         GUIA = 'GUIA', 'Guía'
         INSTRUCTIVO = 'INSTRUCTIVO', 'Instructivo'
@@ -44,6 +45,13 @@ class Documento(TimeStampedModel):
     codigo = models.CharField(max_length=20, unique=True)
     titulo = models.CharField(max_length=200)
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    # Clasificación interna del Listado Maestro de Documentos SGSI (FO real de la
+    # organización): a qué proceso/subproceso pertenece el documento — p.ej. 'DAT'/
+    # 'GHU'/'DTI' y 'TYC'/'TI'. No corresponde 1 a 1 con el catálogo `activos.Proceso`
+    # (son códigos internos de numeración documental, no el mismo catálogo), así que se
+    # deja como texto libre opcional en vez de forzar una relación que no aplica.
+    proceso = models.CharField(max_length=10, blank=True, verbose_name='Proceso')
+    sub_proceso = models.CharField(max_length=10, blank=True, verbose_name='Sub proceso', db_column='subProceso')
     version_actual = models.CharField(max_length=10, default='1.0', db_column='versionActual')
     estado = models.CharField(max_length=15, choices=Estado.choices, default=Estado.BORRADOR)
     propietario = models.ForeignKey(

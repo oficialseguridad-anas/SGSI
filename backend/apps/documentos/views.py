@@ -1,9 +1,12 @@
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
+from rest_framework.views import APIView
 
 from apps.core.views import DescargaArchivoMixin
 
+from .excel_builder_listado import generar_listado_maestro_xlsx
 from .models import Documento, VersionDocumento
 from .serializers import DocumentoSerializer, VersionDocumentoSerializer
 
@@ -29,6 +32,24 @@ class DocumentoViewSet(DescargaArchivoMixin, viewsets.ModelViewSet):
                 archivo=documento.archivo,
                 creado_por=self.request.user,
             )
+
+
+class ListadoMaestroDocumentosView(APIView):
+    """Genera y descarga el Listado Maestro de Documentos SGSI (FO institucional real,
+    con una hoja por tipo de documento) a partir de los `Documento` actuales — se
+    regenera en cada descarga, así que siempre refleja lo que haya guardado en ese
+    momento, sin necesidad de mantener un archivo aparte actualizado a mano."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        buffer = generar_listado_maestro_xlsx()
+        respuesta = HttpResponse(
+            buffer.read(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        respuesta['Content-Disposition'] = 'attachment; filename="Listado_Maestro_de_Documentos_SGSI.xlsx"'
+        return respuesta
 
 
 class VersionDocumentoViewSet(DescargaArchivoMixin, viewsets.ModelViewSet):

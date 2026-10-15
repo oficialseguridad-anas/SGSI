@@ -8,34 +8,18 @@ import { BRAND } from '../../../shared/theme/brand';
 import { normalizarTexto } from '../../../shared/utils/normalizarTexto';
 import { DocumentoFormModal } from '../components/DocumentoFormModal';
 import { HistorialVersionesModal } from '../components/HistorialVersionesModal';
+import { ListadoMaestroModal } from '../components/ListadoMaestroModal';
 import { PrevisualizarDocumentoModal } from '../components/PrevisualizarDocumentoModal';
 import { eliminarDocumento, fetchDocumentos } from '../api';
+import { NOMBRE_TIPO, TIPOS_DOCUMENTO } from '../tipoDocumento';
 import type { Documento, EstadoDocumento, TipoDocumento } from '../types';
-
-const NOMBRE_TIPO: Record<TipoDocumento, string> = {
-  FORMATO: 'Formato',
-  GUIA: 'Guía',
-  INSTRUCTIVO: 'Instructivo',
-  MANUAL: 'Manual',
-  MATRIZ: 'Matriz',
-  PLAN: 'Plan',
-  POLITICA: 'Política',
-  PROCEDIMIENTO: 'Procedimiento',
-  PROGRAMA: 'Programa',
-  PROTOCOLO: 'Protocolo',
-  REGISTRO: 'Registro',
-};
-
-const TIPOS_DOCUMENTO: TipoDocumento[] = [
-  'FORMATO', 'GUIA', 'INSTRUCTIVO', 'MANUAL', 'MATRIZ', 'PLAN',
-  'POLITICA', 'PROCEDIMIENTO', 'PROGRAMA', 'PROTOCOLO', 'REGISTRO',
-];
 
 // Paleta categórica: los 8 tonos fijos validados con el skill de dataviz (mismo orden
 // que GraficaActivosPorClase) para los primeros 8 tipos, extendida con 3 tonos
 // adicionales bien diferenciados para los tipos restantes. Cada tarjeta siempre
 // muestra su etiqueta de texto, así que el color nunca es el único canal de identidad.
 const COLOR_TIPO: Record<TipoDocumento, string> = {
+  ALCANCE: '#827717',
   FORMATO: '#2a78d6',
   GUIA: '#eb6834',
   INSTRUCTIVO: '#1baf7a',
@@ -113,6 +97,7 @@ export function DocumentosPage() {
   const [historialAbierto, setHistorialAbierto] = useState(false);
   const [documentoParaHistorial, setDocumentoParaHistorial] = useState<Documento | null>(null);
   const [filtroTipo, setFiltroTipo] = useState<TipoDocumento | null>(null);
+  const [listadoMaestroAbierto, setListadoMaestroAbierto] = useState(false);
 
   // Filtro instantáneo en el cliente: el listado completo ya viaja en un solo request
   // (no hay paginación en este módulo), así que filtrar localmente responde al instante
@@ -245,9 +230,12 @@ export function DocumentosPage() {
     <Card
       title="Documentos"
       extra={
-        hasPerm('documentos.add_documento') && (
-          <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo documento</Button>
-        )
+        <Space>
+          <Button onClick={() => setListadoMaestroAbierto(true)}>Listado Maestro</Button>
+          {hasPerm('documentos.add_documento') && (
+            <Button type="primary" icon={<PlusOutlined />} onClick={abrirCrear}>Nuevo documento</Button>
+          )}
+        </Space>
       }
     >
       <ErrorCarga visible={isError} entidad="los documentos" />
@@ -327,6 +315,11 @@ export function DocumentosPage() {
         open={historialAbierto}
         documento={documentoParaHistorial}
         onClose={() => setHistorialAbierto(false)}
+      />
+      <ListadoMaestroModal
+        open={listadoMaestroAbierto}
+        documentos={documentos}
+        onClose={() => setListadoMaestroAbierto(false)}
       />
     </Card>
   );

@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.models import Permission
 from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied, ValidationError
@@ -24,6 +25,7 @@ from .serializers import (
     Desactivar2FASerializer,
     EmpleadoSerializer,
     MeSerializer,
+    PermisoSerializer,
     ReenviarCodigoOtpSerializer,
     RolSerializer,
     Setup2FASerializer,
@@ -460,10 +462,40 @@ class ImportarEmpleadosView(APIView):
 
 
 class RolViewSet(viewsets.ModelViewSet):
-    queryset = Rol.objects.all().order_by('nombre')
+    queryset = Rol.objects.select_related('grupo').all().order_by('nombre')
     serializer_class = RolSerializer
     permission_classes = [EsAdministrador]
     search_fields = ['nombre']
+
+    def perform_destroy(self, instance):
+        # Se bloquea para los roles de sistema (es_rol_sistema), igual que otros
+        # módulos protegen sus registros base (ej. TipoHallazgo).
+        if instance.es_rol_sistema:
+            raise ValidationError('Este rol es del sistema y no se puede eliminar.')
+        # Se borra el `Group` (no el `Rol` directo): `Rol.grupo` es CASCADE desde
+        # Group -> Rol, no al revés, así que borrar solo el Rol dejaría el Group
+        # huérfano en la BD. Borrar el Group sí cascada hacia el Rol (lo colecta el
+        # ORM) y además limpia automáticamente su membresía M2M (saca el grupo de
+        # `usuario.groups` de todos los que lo tenían) — mismo tipo de bug real ya
+        # encontrado y corregido en `_sincronizar_roles` (serializers.py): un DELETE
+        # a medias deja usuarios con permisos que ya no deberían tener.
+        instance.grupo.delete()
+
+
+class PermisoViewSet(viewsets.ReadOnlyModelViewSet):
+    """Catálogo de permisos de Django disponibles — para armar los checkboxes al crear/
+    editar un Rol o al asignarle permisos individuales a un Usuario. Solo lectura: los
+    permisos los crea Django solo (uno add/change/delete/view por modelo)."""
+
+    queryset = Permission.objects.select_related('content_type').order_by(
+        'content_type__app_label', 'content_type__model', 'codename',
+    )
+    serializer_class = PermisoSerializer
+    permission_classes = [EsAdministrador]
+    # Sin override de paginación: usa la misma por defecto que el resto de la API
+    # (PAGE_SIZE=500), así que con ~150-250 permisos reales siempre caben en una sola
+    # página — se mantiene el mismo shape `{results, count}` que todos los demás
+    # `fetchX()` del frontend, sin necesitar un caso especial para este endpoint.
 
 
 class UsuarioRolViewSet(viewsets.ModelViewSet):

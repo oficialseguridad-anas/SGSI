@@ -1,4 +1,5 @@
 export type TipoDocumento =
+  | 'ALCANCE'
   | 'FORMATO'
   | 'GUIA'
   | 'INSTRUCTIVO'
@@ -38,6 +39,8 @@ export interface Documento {
   codigo: string;
   titulo: string;
   tipo: TipoDocumento;
+  proceso: string;
+  sub_proceso: string;
   version_actual: string;
   estado: EstadoDocumento;
   propietario: number;
@@ -54,6 +57,8 @@ export interface DocumentoInput {
   codigo: string;
   titulo: string;
   tipo: TipoDocumento;
+  proceso: string;
+  sub_proceso: string;
   version_actual: string;
   estado: EstadoDocumento;
   propietario: number;

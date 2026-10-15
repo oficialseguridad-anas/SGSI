@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Group, Permission
 from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 
@@ -16,38 +17,135 @@ class EmpleadoSerializer(serializers.ModelSerializer):
         return hasattr(obj, 'usuario') and obj.usuario is not None
 
 
+class PermisoSerializer(serializers.ModelSerializer):
+    app_label = serializers.CharField(source='content_type.app_label', read_only=True)
+    modelo = serializers.CharField(source='content_type.model', read_only=True)
+
+    class Meta:
+        model = Permission
+        fields = ['id', 'name', 'codename', 'app_label', 'modelo']
+
+
 class RolSerializer(serializers.ModelSerializer):
+    # Entrada: ids de Permission a asignar al Group que respalda este Rol — ver
+    # create()/update() más abajo, donde se traducen a `grupo.permissions.set(...)`.
+    permisos = serializers.PrimaryKeyRelatedField(
+        many=True, queryset=Permission.objects.all(), write_only=True, required=False,
+    )
+    # Salida: detalle legible de los permisos ya asignados (para marcar los checkboxes
+    # correctos al editar un rol existente).
+    permisos_detalle = serializers.SerializerMethodField()
+
     class Meta:
         model = Rol
-        fields = ['id', 'nombre', 'descripcion', 'es_rol_sistema']
+        fields = ['id', 'nombre', 'descripcion', 'es_rol_sistema', 'permisos', 'permisos_detalle']
+        read_only_fields = ['id', 'es_rol_sistema']
+
+    def get_permisos_detalle(self, obj):
+        permisos = obj.grupo.permissions.select_related('content_type').order_by(
+            'content_type__app_label', 'content_type__model', 'codename',
+        )
+        return PermisoSerializer(permisos, many=True).data
+
+    def create(self, validated_data):
+        permisos = validated_data.pop('permisos', [])
+        grupo = Group.objects.create(name=validated_data['nombre'])
+        if permisos:
+            grupo.permissions.set(permisos)
+        return Rol.objects.create(grupo=grupo, **validated_data)
+
+    def update(self, instance, validated_data):
+        permisos = validated_data.pop('permisos', None)
+        if permisos is not None:
+            instance.grupo.permissions.set(permisos)
+        nuevo_nombre = validated_data.get('nombre')
+        if nuevo_nombre and nuevo_nombre != instance.grupo.name:
+            instance.grupo.name = nuevo_nombre
+            instance.grupo.save(update_fields=['name'])
+        return super().update(instance, validated_data)
 
 
 class UsuarioSerializer(serializers.ModelSerializer):
     roles = RolSerializer(many=True, read_only=True)
+    # Entrada (edición): ids de Rol a asignar — se traduce a filas `UsuarioRol` reales
+    # en update() más abajo (no basta con tocar `usuario.groups` directo, porque
+    # `Usuario.roles` se calcula desde `UsuarioRol`, no desde `groups`).
+    roles_ids = serializers.PrimaryKeyRelatedField(
+        source='roles', many=True, queryset=Rol.objects.all(), write_only=True, required=False,
+    )
+    permisos_directos = PermisoSerializer(source='user_permissions', many=True, read_only=True)
+    permisos_ids = serializers.PrimaryKeyRelatedField(
+        source='user_permissions', many=True, queryset=Permission.objects.all(), write_only=True, required=False,
+    )
     direccion_nombre = serializers.CharField(source='direccion.nombre', read_only=True, default=None)
 
     class Meta:
         model = Usuario
         fields = [
             'id', 'email', 'nombre_completo', 'cargo', 'direccion', 'direccion_nombre', 'telefono',
-            'is_active', 'debe_cambiar_password', 'roles', 'date_joined',
+            'is_active', 'debe_cambiar_password', 'roles', 'roles_ids', 'permisos_directos', 'permisos_ids',
+            'date_joined',
         ]
         read_only_fields = ['id', 'date_joined']
+
+    def update(self, instance, validated_data):
+        roles_nuevos = validated_data.pop('roles', None)
+        permisos_nuevos = validated_data.pop('user_permissions', None)
+        instance = super().update(instance, validated_data)
+        if roles_nuevos is not None:
+            request = self.context.get('request')
+            _sincronizar_roles(instance, roles_nuevos, asignado_por=request.user if request else None)
+        if permisos_nuevos is not None:
+            instance.user_permissions.set(permisos_nuevos)
+        return instance
 
 
 class UsuarioCreateSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=8)
+    roles_ids = serializers.PrimaryKeyRelatedField(
+        source='roles', many=True, queryset=Rol.objects.all(), write_only=True, required=False,
+    )
+    permisos_ids = serializers.PrimaryKeyRelatedField(
+        source='user_permissions', many=True, queryset=Permission.objects.all(), write_only=True, required=False,
+    )
 
     class Meta:
         model = Usuario
         fields = [
             'id', 'email', 'nombre_completo', 'cargo', 'direccion', 'telefono',
-            'password', 'is_active', 'debe_cambiar_password',
+            'password', 'is_active', 'debe_cambiar_password', 'roles_ids', 'permisos_ids',
         ]
 
     def create(self, validated_data):
         password = validated_data.pop('password')
-        return Usuario.objects.create_user(password=password, **validated_data)
+        roles = validated_data.pop('roles', [])
+        permisos = validated_data.pop('user_permissions', [])
+        usuario = Usuario.objects.create_user(password=password, **validated_data)
+        if roles:
+            request = self.context.get('request')
+            _sincronizar_roles(usuario, roles, asignado_por=request.user if request else None)
+        if permisos:
+            usuario.user_permissions.set(permisos)
+        return usuario
+
+
+def _sincronizar_roles(usuario, roles_nuevos, asignado_por=None):
+    """Crea/elimina filas `UsuarioRol` para que terminen siendo exactamente
+    `roles_nuevos` — nunca se tocan `usuario.groups` directamente, eso ya lo hace
+    `UsuarioRol.save()`/`.delete()` (ver models.py).
+
+    Las eliminaciones se hacen instancia por instancia (`.delete()` en cada una), NO
+    con un `.delete()` sobre el queryset filtrado: un `.delete()` de queryset hace un
+    DELETE masivo en SQL y NO llama al `.delete()` sobreescrito del modelo — se perdía
+    silenciosamente el `usuario.groups.remove(grupo)`, dejando al usuario con los
+    permisos del rol aunque la fila `UsuarioRol` ya no existiera (bug real, detectado
+    probando con datos reales, no solo revisando el código)."""
+    actuales = set(usuario.usuario_roles.values_list('rol_id', flat=True))
+    nuevos = {rol.id for rol in roles_nuevos}
+    for rol_id in nuevos - actuales:
+        UsuarioRol.objects.get_or_create(usuario=usuario, rol_id=rol_id, defaults={'asignado_por': asignado_por})
+    for usuario_rol in usuario.usuario_roles.filter(rol_id__in=(actuales - nuevos)):
+        usuario_rol.delete()
 
 
 class UsuarioRolSerializer(serializers.ModelSerializer):

@@ -4,6 +4,7 @@ import { LoginPage } from './features/accounts/pages/LoginPage';
 import { DashboardPage } from './features/accounts/pages/DashboardPage';
 import { SeguridadPage } from './features/accounts/pages/SeguridadPage';
 import { EmpleadosPage } from './features/accounts/pages/EmpleadosPage';
+import { RolesPage } from './features/accounts/pages/RolesPage';
 import { UsuariosPage } from './features/accounts/pages/UsuariosPage';
 import { ActivosPage } from './features/activos/pages/ActivosPage';
 import { RevisionesActivosPage } from './features/activos/pages/RevisionesActivosPage';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/empleados" element={<EmpleadosPage />} />
           <Route element={<AdminRoute />}>
             <Route path="/usuarios" element={<UsuariosPage />} />
+            <Route path="/roles" element={<RolesPage />} />
             <Route path="/backups" element={<BackupsPage />} />
           </Route>
           <Route path="/seguridad" element={<SeguridadPage />} />
