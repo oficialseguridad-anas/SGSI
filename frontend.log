@@ -3,10 +3,11 @@
 > vite
 
 
-  [32m[1mVITE[22m v8.2.1[39m  [2mready in [0m[1m1336[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v8.2.1[39m  [2mready in [0m[1m1501[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.17.224.1:[1m5173[22m/[39m   [2mvEthernet (Default …[22m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.56.1:[1m5173[22m/[39m   [2mEthernet 2[22m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.0.129:[1m5173[22m/[39m  [2mWi-Fi[22m
-  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.17.224.1:[1m5173[22m/[39m   [2mvEthernet (Default …[22m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://172.18.32.1:[1m5173[22m/[39m    [2mvEthernet (WSL (Hyp…[22m
+[2m7:46:09 a. m.[22m [31m[1m[vite][22m[39m [31m[2m(client)[22m[39m [2m[console.error] [22mWarning: [antd: Modal] `maskClosable` is deprecated. Please use `mask.closable` instead.

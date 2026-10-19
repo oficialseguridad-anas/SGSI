@@ -225,33 +225,42 @@ export function RiesgosPage() {
       // respete de verdad y no quede espacio vacío a la derecha. Si un nombre no
       // cabe, se recorta con "…" dentro del propio ancho de la celda (no se deja
       // invadir la columna vecina) — el nombre completo se ve en el tooltip al
-      // pasar el cursor, o abriendo el detalle con el clic.
+      // pasar el cursor, o abriendo el detalle con el clic. La altura de la celda
+      // se acota (con scroll interno si hay muchos activos) para que la fila no
+      // crezca sin límite y quede pareja con el resto de columnas.
       render: (_: unknown, riesgo: Riesgo) => (
-        <Space size={[4, 4]} wrap style={{ maxWidth: '100%' }}>
-          {riesgo.activos_nombres.map((nombre, i) => (
-            <Tooltip key={riesgo.activos[i]} title={nombre}>
-              <Tag
-                style={{
-                  cursor: 'pointer', margin: 0, padding: '0 5px', fontSize: 11, lineHeight: '18px',
-                  maxWidth: '100%', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  display: 'inline-block', verticalAlign: 'middle', boxSizing: 'border-box',
-                }}
-                onClick={() => abrirActivo(riesgo.activos[i])}
-              >
-                {nombre}
-              </Tag>
-            </Tooltip>
-          ))}
-        </Space>
+        <div style={{ maxHeight: 68, overflowY: 'auto', overflowX: 'hidden' }}>
+          <Space size={[4, 4]} wrap style={{ width: '100%' }}>
+            {riesgo.activos_nombres.map((nombre, i) => (
+              <Tooltip key={riesgo.activos[i]} title={nombre}>
+                <Tag
+                  style={{
+                    cursor: 'pointer', margin: 0, padding: '0 5px', fontSize: 11, lineHeight: '18px',
+                    maxWidth: '100%', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    display: 'inline-block', verticalAlign: 'middle', boxSizing: 'border-box',
+                  }}
+                  onClick={() => abrirActivo(riesgo.activos[i])}
+                >
+                  {nombre}
+                </Tag>
+              </Tooltip>
+            ))}
+          </Space>
+        </div>
       ),
     },
     {
       title: 'Amenaza',
       dataIndex: 'amenaza_nombre',
       key: 'amenaza_nombre',
-      width: 160,
+      width: 170,
       render: (nombre: string, riesgo: Riesgo) => (
-        <Tooltip title={riesgo.amenaza_descripcion || nombre}>{nombre}</Tooltip>
+        <Typography.Paragraph
+          ellipsis={{ rows: 3, tooltip: riesgo.amenaza_descripcion || nombre }}
+          style={{ marginBottom: 0, fontSize: 13 }}
+        >
+          {nombre}
+        </Typography.Paragraph>
       ),
     },
     {

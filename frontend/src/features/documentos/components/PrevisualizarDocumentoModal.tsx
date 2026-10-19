@@ -1,6 +1,8 @@
 import { DownloadOutlined, FileOutlined } from '@ant-design/icons';
 import { Alert, Button, Empty, Modal, Skeleton, Tabs } from 'antd';
-import { useEffect, useState } from 'react';
+import mammoth from 'mammoth';
+import { PPTXViewer } from 'pptxviewjs';
+import { useEffect, useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { descargarArchivo, nombreDeArchivo, obtenerUrlPrevisualizacion } from '../../../shared/api/descargarArchivo';
 
@@ -12,7 +14,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Tipo = 'pdf' | 'imagen' | 'excel' | 'texto' | 'otro';
+type Tipo = 'pdf' | 'imagen' | 'excel' | 'word' | 'powerpoint' | 'texto' | 'otro';
 
 interface HojaExcel {
   nombre: string;
@@ -24,6 +26,13 @@ function tipoDeArchivo(nombre: string): Tipo {
   if (extension === 'pdf') return 'pdf';
   if (['png', 'jpg', 'jpeg'].includes(extension)) return 'imagen';
   if (['xlsx', 'xls', 'xlsm'].includes(extension)) return 'excel';
+  // Word y PowerPoint se convierten en el propio navegador (sin servidor de por medio):
+  // .docx con `mammoth` (a HTML, con bastante fidelidad de formato) y .pptx dibujando cada
+  // diapositiva en un <canvas> con `pptxviewjs`. Los formatos antiguos .doc/.ppt (binarios,
+  // no son un zip de XML/OOXML) no tienen una librería JS confiable para esto y quedan
+  // como "otro".
+  if (extension === 'docx') return 'word';
+  if (extension === 'pptx') return 'powerpoint';
   if (['txt', 'csv'].includes(extension)) return 'texto';
   return 'otro';
 }
@@ -35,12 +44,15 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
   const [textoPlano, setTextoPlano] = useState<string | null>(null);
   const [hojasExcel, setHojasExcel] = useState<HojaExcel[] | null>(null);
   const [hojaActiva, setHojaActiva] = useState<string>('');
+  const [htmlWord, setHtmlWord] = useState<string | null>(null);
+  const contenedorPptxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open || !documentoId || !archivo) return;
 
     let cancelado = false;
     let urlCreada: string | null = null;
+    let rendererPptx: PPTXViewer | null = null;
 
     async function cargar() {
       setCargando(true);
@@ -49,6 +61,8 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
       setTextoPlano(null);
       setHojasExcel(null);
       setHojaActiva('');
+      setHtmlWord(null);
+      if (contenedorPptxRef.current) contenedorPptxRef.current.innerHTML = '';
       try {
         const ruta = `/documentos/${documentoId}/descargar/`;
         const { url, tipo: mime } = await obtenerUrlPrevisualizacion(ruta);
@@ -72,6 +86,34 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
             setHojasExcel(hojas);
             setHojaActiva(hojas[0]?.nombre ?? '');
           }
+        } else if (tipo === 'word') {
+          const buffer = await (await fetch(url)).arrayBuffer();
+          const resultado = await mammoth.convertToHtml({ arrayBuffer: buffer });
+          if (!cancelado) setHtmlWord(resultado.value);
+        } else if (tipo === 'powerpoint') {
+          const buffer = await (await fetch(url)).arrayBuffer();
+          rendererPptx = new PPTXViewer({});
+          await rendererPptx.loadFile(buffer);
+          const total = rendererPptx.getSlideCount();
+          if (!cancelado && contenedorPptxRef.current) {
+            for (let i = 0; i < total; i++) {
+              const canvas = document.createElement('canvas');
+              // `pptxviewjs` ajusta el contenido de la diapositiva (preservando su
+              // proporción real, sin deformarla) dentro de las dimensiones que tenga el
+              // <canvas> en el momento de renderizar — por eso se fija un tamaño explícito
+              // en `style.width/height` ANTES de llamar a `renderSlide`.
+              canvas.style.width = '740px';
+              canvas.style.height = '480px';
+              canvas.style.maxWidth = '100%';
+              canvas.style.display = 'block';
+              canvas.style.margin = '0 auto 12px';
+              canvas.style.border = '1px solid #e1e0d9';
+              canvas.style.borderRadius = '4px';
+              contenedorPptxRef.current.appendChild(canvas);
+              await rendererPptx.renderSlide(i, canvas);
+              if (cancelado) break;
+            }
+          }
         } else {
           setUrlPrevia(url);
         }
@@ -88,6 +130,7 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
     return () => {
       cancelado = true;
       if (urlCreada) URL.revokeObjectURL(urlCreada);
+      if (rendererPptx) rendererPptx.destroy();
     };
   }, [open, documentoId, archivo]);
 
@@ -102,6 +145,19 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
         <div>
           {cargando && <Skeleton active paragraph={{ rows: 6 }} />}
           {error && <Alert type="error" message={error} showIcon />}
+
+          {/* El contenedor de PowerPoint se monta siempre (oculto mientras carga) porque
+              `pptxviewjs` dibuja los <canvas> directamente en él vía `ref`, apenas termina
+              la carga asíncrona — si solo existiera cuando `!cargando`, la ref todavía
+              estaría vacía en ese momento. */}
+          <div
+            ref={contenedorPptxRef}
+            style={{
+              display: tipo === 'powerpoint' && !cargando && !error ? 'block' : 'none',
+              maxHeight: 560,
+              overflow: 'auto',
+            }}
+          />
 
           {!cargando && !error && (
             <>
@@ -145,6 +201,20 @@ export function PrevisualizarDocumentoModal({ open, titulo, documentoId, archivo
                     }}
                   />
                 </div>
+              )}
+              {tipo === 'word' && htmlWord !== null && (
+                <div
+                  style={{
+                    maxHeight: 560,
+                    overflow: 'auto',
+                    border: '1px solid #e1e0d9',
+                    borderRadius: 4,
+                    padding: 16,
+                  }}
+                  // El HTML viene de `mammoth` a partir del propio archivo .docx que el
+                  // usuario acaba de subir/descargar — no de entrada de terceros.
+                  dangerouslySetInnerHTML={{ __html: htmlWord }}
+                />
               )}
               {tipo === 'texto' && textoPlano !== null && (
                 <pre

@@ -1489,6 +1489,28 @@ Stop-Process -Id <ese_numero> -Force
     llegaba a aplicarse). Cada `Tag` se envolvió además en un `Tooltip`
     que muestra el nombre completo al pasar el cursor — el detalle
     completo también se ve igual al hacer clic (`ActivoDetalleModal`).
+  - **Filas con texto "montado" entre columnas Activos/Amenaza
+    (2026-10-15, a pedido del usuario)**: con riesgos que tienen varios
+    activos (4-6) y una descripción de amenaza larga, las filas crecían
+    mucho y de forma muy dispareja entre columnas — el usuario reportó
+    (con captura) texto de una columna/fila superpuesto visualmente sobre
+    el de la siguiente. Dos ajustes: (1) el contenedor `Space wrap` de
+    "Activos" ahora usa `width: '100%'` en vez de `maxWidth: '100%'` —
+    un `Space` es `inline-flex`, que por defecto se ajusta a su
+    contenido; `maxWidth` solo pone un tope pero no garantiza que tome el
+    ancho real de la celda, mientras que `width: '100%'` sí lo fuerza,
+    haciendo que el recorte con elipsis de cada `Tag` sea confiable de
+    verdad. Además la celda completa se envolvió en un `div` con
+    `maxHeight: 68` + `overflowY: 'auto'` (scroll interno si hay muchos
+    activos, en vez de crecer sin límite). (2) La columna "Amenaza" pasó
+    de texto plano envuelto en un `Tooltip` (que dejaba que el párrafo
+    completo se envolviera en tantas líneas como hiciera falta) a
+    `Typography.Paragraph` con `ellipsis={{ rows: 3, tooltip: ... }}` —
+    antd recorta a 3 líneas con "…" y muestra el texto completo en un
+    tooltip nativo, sin necesidad de CSS manual. Con ambas columnas
+    acotadas a una altura similar (~68-70px), las filas quedan parejas y
+    no hay margen para que el contenido de una invada visualmente la
+    fila vecina.
   Las constantes de etiquetas/colores de Activo (`NOMBRE_CLASE`,
   `NOMBRE_TIPO_ACTIVO`, `COLOR_ETIQUETADO`, `COLOR_ESTADO`,
   `COLOR_CRITICIDAD`, `NOMBRE_CRITICIDAD`) se **extrajeron** de
@@ -1571,8 +1593,96 @@ Stop-Process -Id <ese_numero> -Force
 - **Vista previa de archivos** (`PrevisualizarDocumentoModal.tsx`): soporta
   PDF, imágenes (png/jpg/jpeg), texto plano (txt/csv) y **Excel**
   (xlsx/xls/xlsm — parseado en el navegador con `xlsx`/SheetJS, renderizado
-  como tabla HTML con pestañas si el libro tiene varias hojas). Otros formatos
-  (doc, ppt, zip...) solo se pueden descargar.
+  como tabla HTML con pestañas si el libro tiene varias hojas).
+  - **Word (.docx) y PowerPoint (.pptx) también con vista previa (2026-10-16,
+    a pedido del usuario)**: antes solo PDF/imagen/Excel se veían embebidos;
+    Word, PowerPoint y sus formatos antiguos solo se podían descargar.
+    - **Primer intento, revertido — conversión a PDF vía LibreOffice en el
+      servidor**: el usuario, dado a elegir entre un enfoque solo-navegador
+      (menor fidelidad) o instalar LibreOffice en el servidor y convertir
+      Word/PowerPoint/ODF a PDF al vuelo (`soffice --headless
+      --convert-to pdf`, con caché en disco), eligió inicialmente la
+      segunda opción por mayor fidelidad. Se instaló LibreOffice con
+      `winget install TheDocumentFoundation.LibreOffice` (quedó instalado
+      en el equipo) y se implementó un `PrevisualizacionArchivoMixin` en el
+      backend — pero **`soffice.exe` no pudo ejecutarse: Windows devolvía
+      "Acceso denegado"** incluso con permisos de administrador. Se
+      investigó con los logs del equipo (`Get-WinEvent`,
+      `Get-AppLockerPolicy`, `Get-MpThreatDetection`) y se encontró que el
+      equipo tiene **Sophos** (antivirus/EDR corporativo) activo, que con
+      alta probabilidad bloquea la ejecución de binarios recién instalados
+      sin reputación conocida — un control de seguridad legítimo del
+      equipo/dominio (`anaswayuuepsi`), no algo que deba intentar saltarse.
+      Ante esto se le presentó la decisión al usuario (pedir a TI que
+      autorice `soffice.exe` en Sophos Central, vs. cambiar de enfoque) y
+      **eligió el enfoque solo-navegador** para no depender de TI. El
+      código del `PrevisualizacionArchivoMixin`/`SOFFICE_PATH` se revirtió
+      por completo (no quedó nada de esto en el repo); LibreOffice sigue
+      instalado en el equipo por si más adelante TI lo autoriza y se
+      retoma ese camino con mejor fidelidad.
+    - **Lo que sí quedó implementado (solo frontend, sin tocar el
+      backend, sin costo)**: nuevos tipos `'word'` y `'powerpoint'` en
+      `tipoDeArchivo()`. **Word (.docx)** se convierte a HTML en el propio
+      navegador con la librería `mammoth` (buena fidelidad: texto,
+      títulos, negritas/cursivas, listas).
+      **PowerPoint (.pptx)** — tres intentos hasta encontrar una librería
+      que de verdad funcionara:
+      1. Extraer solo el texto de cada diapositiva con `jszip` (sin diseño
+         visual) — descartado por pedido del usuario de algo con mejor
+         fidelidad.
+      2. **`pptx-browser`** (MIT, cero dependencias) — se integró
+         completa, pero probada contra un .pptx real del sistema
+         (`ALC-860-01_Alcance_SGSI_V_2.0.pptx`, 13 diapositivas) resultó
+         ser un **bug real de la librería**: las 13 diapositivas
+         renderizaban en blanco absoluto (0 píxeles no-blancos de 455.400
+         en cada canvas), por un `ReferenceError: Cannot access 'defRPr'
+         before initialization` dentro de su propio `renderTextBody()` —
+         reproducible al 100%, en todas las diapositivas. Diagnosticado
+         copiando el archivo real a `frontend/public/_debug/` y
+         ejecutándolo con Playwright headless contra una ruta de prueba
+         temporal (`/debug-pptx`, un componente React ad-hoc) para leer la
+         consola del navegador y contar píxeles por canvas — todo
+         revertido/borrado después del diagnóstico. Se desinstaló por
+         completamente inutilizable.
+      3. **`pptxviewjs`** (MIT, API `PPTXViewer` con `loadFile()` +
+         `renderSlide(indice, canvas)` + `getSlideCount()`) — probada con
+         el mismo método contra el mismo archivo real: SÍ renderiza
+         correctamente (texto, tablas, diagramas con colores, imágenes),
+         confirmado visualmente con una captura de pantalla real. Quedó
+         como la solución final. Requiere `jszip` y `chart.js` como
+         dependencias (el propio paquete las importa internamente, aunque
+         no se usen gráficos). Detalle de implementación importante: la
+         librería ajusta el contenido de la diapositiva **dentro de las
+         dimensiones que tenga el `<canvas>` en el momento de llamar a
+         `renderSlide`** (preservando la proporción real, sin deformar —
+         usa `scale = min(ancho/anchoReal, alto/altoReal)` y centra) —  por
+         eso cada `<canvas>` se crea con `style.width/height` fijos
+         (740×480) ANTES de renderizar; si no, cae al tamaño por defecto
+         de un `<canvas>` sin atributos (300×150, el default del estándar
+         HTML, no del archivo). El `<div ref={contenedorPptxRef}>` donde
+         se van insertando los canvases (uno por diapositiva, de forma
+         secuencial con `await` en un loop) se monta siempre que
+         `tipo === 'powerpoint'` (oculto con `display:none` mientras
+         `cargando` es true) y NO dentro del bloque condicionado por
+         `!cargando` como el resto de tipos — si solo existiera después de
+         cargar, la `ref` estaría vacía (`null`) en el momento en que se
+         necesita hacer `appendChild` de cada canvas.
+      Los formatos antiguos **.doc/.ppt** (binarios, no son un zip de
+      XML/OOXML) se quedan sin vista previa (solo descarga) — ni
+      `mammoth` ni `pptxviewjs` les sirven, y no se instaló nada adicional
+      para cubrirlos dado que el camino de mayor fidelidad para TODOS los
+      formatos (LibreOffice) quedó bloqueado por Sophos, y las
+      alternativas de pago (Aspose) y de infraestructura nueva (Gotenberg
+      en Cloud Run — descartado también porque el destino de producción
+      son Windows Server en GCP sin Office/LibreOffice y el usuario no
+      quiso agregar infraestructura nueva en la nube) quedaron fuera de
+      alcance a pedido del usuario.
+      **Lección para el futuro**: antes de confiar en una librería JS de
+      terceros para renderizar formatos de archivo complejos (Office,
+      CAD, etc.), probarla contra un archivo REAL del sistema (no un
+      ejemplo de juguete de la documentación) — `pptx-browser` tenía buena
+      pinta en el papel (MIT, cero dependencias, API limpia) pero estaba
+      completamente rota en la práctica contra contenido real.
 - **Tarjetas KPI** (`DocumentosPage.tsx`) agrupadas por **Tipo** (12 tipos fijos
   del enum `TipoDocumento`, el 12º — `ALCANCE`/"Alcance" — agregado el
   2026-10-14 a pedido del usuario, tras detectar en la comparación contra el
